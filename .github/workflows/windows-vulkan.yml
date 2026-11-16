@@ -18,8 +18,9 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     env:
-      VCPKG_ROOT: ${{ github.workspace }}\out\vcpkg
+      VCPKG_DIR: ${{ github.workspace }}\out\vcpkg
       VCPKG_INSTALLED_DIR: ${{ github.workspace }}\out\vcpkg_installed
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\out\vcpkg-bincache
       CMAKE_BUILD_PARALLEL_LEVEL: 4
       VCPKG_MAX_CONCURRENCY: 4
       BUILD_DIR: ${{ github.workspace }}\out\x64-win32-vulkan
@@ -49,7 +50,7 @@ jobs:
       - name: Restore vcpkg binary cache
         uses: actions/cache/restore@v4
         with:
-          path: ~/.cache/vcpkg/archives
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: win-x64-vcpkg-${{ steps.baseline.outputs.revision }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay-ports/**') }}
           restore-keys: |
             win-x64-vcpkg-${{ steps.baseline.outputs.revision }}-
@@ -65,14 +66,19 @@ jobs:
       - name: Bootstrap vcpkg
         shell: pwsh
         run: |
-          & "$env:VCPKG_ROOT\bootstrap-vcpkg.bat" -disableMetrics
+          # The runner image exports VCPKG_ROOT for the Visual Studio copy of
+          # vcpkg, so keep our checkout in its own variable and hand it to CMake.
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          & "$env:VCPKG_DIR\bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Configure (Windows x64 Vulkan)
         shell: pwsh
         run: |
+          $env:VCPKG_ROOT = $env:VCPKG_DIR
           cmake -S . -B "$env:BUILD_DIR" -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
+            -DPVZ_VCPKG_ROOT="$env:VCPKG_DIR" `
             -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
             -DPVZ_WINDOW_BACKEND=WIN32 `
             -DPVZ_WINDOWS_PLATFORM=WIN10 `
@@ -93,7 +99,7 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: ~/.cache/vcpkg/archives
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
           key: win-x64-vcpkg-${{ steps.baseline.outputs.revision }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay-ports/**') }}
 
       - name: Stage PC package
