@@ -28,6 +28,7 @@ bool IsScaleEffectFormat(unsigned int format)
 #include <cmath>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -229,6 +230,33 @@ struct ScaleEffectCompiler::Impl {
         const wchar_t* args[] = {name.c_str(), L"-E", L"__M", L"-T", L"cs_6_0",
             L"-spirv", L"-fspv-target-env=vulkan1.2", L"-HV", L"2018",
             L"-O3", L"-Ges", L"-I", directory.c_str()};
+        // Diagnostic-only: record the exact wide paths handed to DXC.
+        if (const char* aDumpDir = std::getenv("PVZ_EFFECT_DUMP"); aDumpDir && aDumpDir[0])
+        {
+            auto toUtf8 = [](const std::wstring& theText) {
+                if (theText.empty()) return std::string();
+                const int aBytes = ::WideCharToMultiByte(CP_UTF8, 0, theText.c_str(),
+                    static_cast<int>(theText.size()), nullptr, 0, nullptr, nullptr);
+                std::string aResult(static_cast<size_t>(aBytes), '\0');
+                ::WideCharToMultiByte(CP_UTF8, 0, theText.c_str(),
+                    static_cast<int>(theText.size()), aResult.data(), aBytes, nullptr, nullptr);
+                return aResult;
+            };
+            static int sArgsIndex = 0;
+            const std::string aBase = std::string(aDumpDir) + "\\dxc-" + std::to_string(sArgsIndex++);
+            std::ofstream aOut(aBase + "-args.txt", std::ios::binary);
+            std::wstring aCwd;
+            try { aCwd = std::filesystem::current_path().wstring(); } catch (...) {}
+            aOut << "sourcePath=" << sourcePath << "\n"
+                 << "name=" << toUtf8(name) << "\n"
+                 << "nameChars=" << name.size() << "\n"
+                 << "dir=" << toUtf8(directory) << "\n"
+                 << "dirChars=" << directory.size() << "\n"
+                 << "cwd=" << toUtf8(aCwd) << "\n"
+                 << "dirExists=" << (std::filesystem::exists(directory) ? 1 : 0) << "\n"
+                 << "nameExists=" << (std::filesystem::exists(name) ? 1 : 0) << "\n"
+                 << "sourceBytes=" << source.size() << "\n";
+        }
         DxcBuffer input{source.data(), source.size(), DXC_CP_UTF8};
         DxcPtr<IDxcResult> result;
         const auto status = compiler.ptr->Compile(&input, args, static_cast<UINT32>(std::size(args)),
@@ -989,6 +1017,30 @@ bool ScaleEffectCompiler::GenerateAndCompilePasses(ScaleEffectDesc& ioDesc,
         for (const auto& [name, value] : aMacroPairs)
             preamble += "#define " + name + " " + value + "\n";
         aSource.insert(0, preamble);
+
+        // Diagnostic-only. Setting PVZ_EFFECT_DUMP=<directory> writes the exact
+        // source handed to DXC plus the resolved paths and the raw diagnostics,
+        // so a non-ASCII install path can be diffed against an ASCII one.
+        // Unset (the default) leaves behaviour untouched.
+        const char* aDumpDir = std::getenv("PVZ_EFFECT_DUMP");
+        const bool aDump = aDumpDir != nullptr && aDumpDir[0] != '\0';
+        std::string aDumpBase;
+        if (aDump)
+        {
+            static int sDumpIndex = 0;
+            aDumpBase = std::string(aDumpDir) + "\\effect-" + std::to_string(sDumpIndex++) +
+                "-pass" + std::to_string(i + 1);
+            std::ofstream aMeta(aDumpBase + "-meta.txt", std::ios::binary);
+            aMeta << "name=" << ioDesc.mName << "\n"
+                  << "sourcePath=" << ioDesc.mSourcePath << "\n"
+                  << "pass=" << (i + 1) << "/" << aPassCount << "\n"
+                  << "psStyle=" << (aPass.mPSStyle ? 1 : 0) << "\n"
+                  << "inputs=" << aPass.mInputs.size() << " outputs=" << aPass.mOutputs.size() << "\n"
+                  << "sourceBytes=" << aSource.size() << "\n";
+            std::ofstream aSrc(aDumpBase + "-source.hlsl", std::ios::binary);
+            aSrc.write(aSource.data(), static_cast<std::streamsize>(aSource.size()));
+        }
+
         bool compiled = false;
         try {
             compiled = dxil
@@ -996,6 +1048,12 @@ bool ScaleEffectCompiler::GenerateAndCompilePasses(ScaleEffectDesc& ioDesc,
                 : mImpl->Compile(aSource, ioDesc.mSourcePath, ioDesc.mCompiledSpirv[i], ioDesc.mError);
         } catch (const std::exception& e) {
             ioDesc.mError = e.what();
+        }
+        if (aDump)
+        {
+            std::ofstream aResult(aDumpBase + "-result.txt", std::ios::binary | std::ios::app);
+            aResult << "compiled=" << (compiled ? 1 : 0) << "\n"
+                    << "error=" << ioDesc.mError << "\n";
         }
         if (!compiled) {
             ioDesc.mError = ioDesc.mName + " pass " + std::to_string(i + 1) + ": " + ioDesc.mError;
