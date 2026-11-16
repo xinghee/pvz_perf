@@ -1,0 +1,141 @@
+"""Observe a manually played game and show temporary charts without a report."""
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import subprocess
+import tempfile
+import time
+
+from windows_game_probe import Game, checked, kernel, measure
+
+
+def plot_samples(directory, label):
+    import csv
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    with (directory / "samples.csv").open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    if not any(row["segment"] == "game" for row in rows):
+        print("No active foreground gameplay samples; no chart produced.", flush=True)
+        return None
+    times = [float(row["elapsed_s"]) for row in rows]
+
+    def values(field):
+        return [
+            float(row[field]) if row["segment"] == "game" and row[field] else float("nan")
+            for row in rows
+        ]
+
+    fig, axes = plt.subplots(2, 1, figsize=(13, 7), sharex=True,
+                             gridspec_kw={"height_ratios": [2, 1]})
+    axes[0].plot(times, values("draw_fps"), color="#13834b", label="FPS")
+    core_fields = [field for field in rows[0] if field.startswith("cpu_lp") and field.endswith("_percent")]
+    if core_fields:
+        cpu_axis = axes[0].twinx()
+        colors = ("#d65b25", "#3259aa", "#9c459b", "#747b18")
+        for field, color in zip(core_fields, colors):
+            core = field[len("cpu_lp"):-len("_percent")]
+            cpu_axis.plot(times, values(field), color=color, label=f"Process on LP{core} (%)")
+        cpu_axis.set_ylim(0, 105)
+        cpu_axis.set_ylabel("Per-core process residency (%)")
+        axes[0].set_ylim(0, max(100, max((float(row["draw_fps"]) for row in rows if row["segment"] == "game" and row["draw_fps"]), default=100) * 1.05))
+        axes[0].set_ylabel("FPS")
+        lines = axes[0].get_lines() + cpu_axis.get_lines()
+        axes[0].legend(lines, [line.get_label() for line in lines], loc="lower right")
+    else:
+        axes[0].plot(times, values("cpu_percent"), color="#bd4a2a", label="CPU % (one core)")
+        maximum = max((float(row[field]) for row in rows if row["segment"] == "game"
+                       for field in ("draw_fps", "cpu_percent") if row[field]), default=100)
+        axes[0].set_ylim(0, max(100, maximum * 1.05))
+        axes[0].set_ylabel("FPS / CPU %")
+        axes[0].legend(loc="lower right")
+    metadata_path = directory / "measurement.json"
+    core_label = json.loads(metadata_path.read_text(encoding="utf-8")).get("core", "LP14") if metadata_path.exists() else "LP14"
+    axes[0].set_title(f"{label} | {core_label} | active gameplay only")
+    axes[1].plot(times, values("cpu_ms_per_draw_frame"), color="#3259aa")
+    axes[1].set_ylim(bottom=0)
+    axes[1].set_ylabel("CPU ms / draw frame")
+    axes[1].set_xlabel("Elapsed time (seconds)")
+    for axis in axes:
+        axis.grid(alpha=0.22)
+    fig.tight_layout()
+    image = directory / "endless.png"
+    fig.savefig(image, dpi=150)
+    plt.close(fig)
+    return image
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--executable", required=True, type=Path)
+    parser.add_argument("--layout-tool", required=True, type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--label", default="pvz_perf / Win7 OpenGL")
+    parser.add_argument("--window-events", action="store_true",
+                        help="Record foreground, focus and capture events outside the game")
+    parser.add_argument("--appdata", type=Path, help="Use an isolated game profile/save directory")
+    parser.add_argument("--settings-file", type=Path, help="Use an isolated game settings file")
+    parser.add_argument("--no-open-chart", action="store_true", help="Save charts without opening a viewer")
+    args = parser.parse_args()
+    executable = args.executable.resolve()
+    directory = args.output.resolve() if args.output else Path(
+        tempfile.mkdtemp(prefix="pvz-game-observation-"))
+    directory.mkdir(parents=True, exist_ok=True)
+    layout = directory / "layout.json"
+    offsets = json.loads(subprocess.check_output([str(args.layout_tool.resolve())], text=True))
+    offsets["executable_sha256"] = hashlib.sha256(executable.read_bytes()).hexdigest()
+    layout.write_text(json.dumps(offsets), encoding="utf-8")
+    environment = {key: value for key, value in os.environ.items()
+                   if not key.startswith(("PVZ_", "VK_"))}
+    if args.appdata:
+        appdata = args.appdata.resolve()
+        if not appdata.is_dir():
+            raise ValueError(f"Game profile directory does not exist: {appdata}")
+        environment["PVZ_APPDATA_DIR"] = str(appdata)
+    if args.settings_file:
+        settings = args.settings_file.resolve()
+        if not settings.is_file():
+            raise ValueError(f"Game settings file does not exist: {settings}")
+        environment["PVZ_SETTINGS_FILE"] = str(settings)
+    process = subprocess.Popen([str(executable)], cwd=executable.parent, env=environment)
+    window_events = None
+    if args.window_events:
+        from windows_window_events import WindowEvents
+        window_events = WindowEvents(process.pid, directory / "window-events.jsonl")
+        window_events.start()
+    handle = checked(kernel.OpenProcess(0x200 | 0x1000, False, process.pid))
+    try:
+        checked(kernel.SetProcessAffinityMask(handle, 0x4000))
+    finally:
+        kernel.CloseHandle(handle)
+    time.sleep(1)
+    game = Game(process.pid, "project", layout)
+    try:
+        print(f"Game PID {process.pid}, pinned to LP14.", flush=True)
+        print("Prepare the endless scene manually; leave Start/Resume pending.", flush=True)
+        input("Press Enter here to begin observation, then click Start/Resume at t=3 seconds. ")
+        result = measure(game, None, "endless", None, directory / "measurement",
+                         preroll=3, interactive=True)
+        print(f"Observation ended: {result['stop_reason']}", flush=True)
+        image = plot_samples(directory / "measurement", args.label)
+        if image:
+            print(f"Chart: {image}", flush=True)
+            if not args.no_open_chart:
+                os.startfile(image)
+        print(f"Temporary samples: {directory}", flush=True)
+    finally:
+        game.close()
+        if window_events is not None:
+            window_events.stop()
+            print(f"Window events: {window_events.output}", flush=True)
+    input("Press Enter to close this observer. The game can remain open. ")
+
+
+if __name__ == "__main__":
+    main()

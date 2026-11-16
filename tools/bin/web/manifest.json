@@ -1,0 +1,59 @@
+{
+  "tool": "PvzDevTools independent save tools",
+  "version": "0.3.0-dfu-v5.1",
+  "memory_model": "wasm32",
+  "source_commit": "09a19f6814c08b290028e5720292ba4dd0764518",
+  "source_dirty": false,
+  "development": true,
+  "source_url": "https://github.com/YuHao2006/PvzDevTools",
+  "files": {
+    "save-editor.html": {
+      "bytes": 52435,
+      "sha256": "42f628e7aa8d16b3c7481b90e2548e1871be30affc6207de84ebf21fb7095747"
+    },
+    "save-converter.html": {
+      "bytes": 603998,
+      "sha256": "96cebd57c0238d293eb860c721659d190ce505773a0d0bfb27cbc64689534f2d"
+    },
+    "save-codec.js": {
+      "bytes": 18137,
+      "sha256": "47fb6bf2f521e35c7eaedb76228cb309ca6579d0951b17f05219f8fdde1d5493"
+    },
+    "lineup-library.js": {
+      "bytes": 2011,
+      "sha256": "406a977fc3d6f26ff97c6cd68a18951de9ebfada9192fe2707a8822a6e642190"
+    },
+    "save-standalone.js": {
+      "bytes": 4979,
+      "sha256": "08ead70922f218d97cc769c053b67c284a2e9e81bc7fd5feec6061b082514af5"
+    },
+    "save-lineups.js": {
+      "bytes": 3419,
+      "sha256": "2a9edf37764e0d201d3e92a86e2fdb8fbfce159ca9800c60b7b694e9f310f1dd"
+    },
+    "save-tool-core.js": {
+      "bytes": 596501,
+      "sha256": "a3bb1ba3012ce68af41773bab0ad79f8ffa5bcdc699f36630c33b83ac70db5ba"
+    },
+    "save-tool-client.js": {
+      "bytes": 1695,
+      "sha256": "5272954785c3ee950cf0e6335346dc7efc7cb565096bee65ccb76b64db1b68ee"
+    },
+    "save-tool-worker.js": {
+      "bytes": 3461,
+      "sha256": "a11c38721008d4ececeaee5794e9f7b851283686499f3791e0a7546ab2a4d8d7"
+    },
+    "save-model.js": {
+      "bytes": 4403,
+      "sha256": "7cd0c4b131ff0fa97d2111b9bb6bc59ee223ed88aa0f5685399026b0643b49c9"
+    },
+    "save-prefab.js": {
+      "bytes": 4185,
+      "sha256": "22bd767491c0064ab0c50a1b2516ed8db02bdd382565adce343c96e93bbafa9e"
+    },
+    "save-generate.js": {
+      "bytes": 382525,
+      "sha256": "dc241ea3d51fd60e9b68692e2da37fe118e97476301e69c331d0815420a33307"
+    }
+  }
+}

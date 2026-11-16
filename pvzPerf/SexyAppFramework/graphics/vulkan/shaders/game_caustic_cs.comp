@@ -1,0 +1,64 @@
+#version 450
+// GPU-only pool caustics: the 256x256 source texture supplies blue bytes.
+// 输出 128x64 RGBA8：RGB 恒白、A=alpha/3。写入与采样值与 BGRA8 版完全
+// 一致（RGB 三字节全等，只有字节序差异，GPU 按格式解释）。
+// CPU receives integer nanoseconds and evaluates signed/wrapped coordinate
+// offsets once. This kernel receives only those offsets; no frame counters,
+// floating-point time, or temporal simulation are involved.
+//  - BilinearLookup uses unsigned division and modulo throughout.
+//  - image_format 必须显式 rgba8：glslc 的 HLSL 前端无法标注格式（默认
+//    Rgba32f 与视图冲突），故本文件用 GLSL 而非 hlsl。
+layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D uSource;
+layout(rgba8, binding = 1) writeonly uniform image2D uDst;
+layout(push_constant) uniform Params { uint u0; uint u1; uint v1; } p;
+
+uint BlueAt(uint index)
+{
+    ivec2 coord = ivec2(int(index % 256u), int(index / 256u));
+    return uint(round(texelFetch(uSource, coord, 0).b * 255.0));
+}
+
+uint BilinearLookup(uint u, uint v)
+{
+    uint timeU = u & 0xFFFF0000u;
+    uint timeV = v & 0xFFFF0000u;
+    uint factorU1 = ((u - timeU) & 0x0000FFFEu) + 1u;
+    uint factorV1 = ((v - timeV) & 0x0000FFFEu) + 1u;
+    uint factorU0 = 65536u - factorU1;
+    uint factorV0 = 65536u - factorV1;
+    uint indexU0 = (timeU >> 16u) % 256u;
+    uint indexU1 = ((timeU >> 16u) + 1u) % 256u;
+    uint indexV0 = (timeV >> 16u) % 256u;
+    uint indexV1 = ((timeV >> 16u) + 1u) % 256u;
+    return ((((factorU0 * factorV1) / 65536u) * BlueAt(indexV1 * 256u + indexU0)) / 65536u) +
+           ((((factorU1 * factorV1) / 65536u) * BlueAt(indexV1 * 256u + indexU1)) / 65536u) +
+           ((((factorU0 * factorV0) / 65536u) * BlueAt(indexV0 * 256u + indexU0)) / 65536u) +
+           ((((factorU1 * factorV0) / 65536u) * BlueAt(indexV0 * 256u + indexU1)) / 65536u);
+}
+
+// C 有符号 int32 除法（向零截断）的无符号等价：正数直接 floor；负数
+// n 的 trunc(n/d) = -floor(-n/d)，按 2^32 回绕。
+
+void main()
+{
+    uvec2 id = gl_GlobalInvocationID.xy;
+    if (id.x >= 128u || id.y >= 64u) return;
+    uint x = id.x;
+    uint y = id.y;
+    uint timeV1 = (256u - y) << 17u;
+    uint timeV0 = y << 17u;
+    uint timeU = x << 17u;
+
+    uint a1 = BilinearLookup(timeU + p.u1, timeV1 + p.v1) & 0xFFu;
+    uint a0 = BilinearLookup(timeU + p.u0, timeV0) & 0xFFu;
+    uint a = (a0 + a1) / 2u;
+
+    uint alpha;
+    if (a >= 160u) alpha = 255u - 2u * (a - 160u);
+    else if (a >= 128u) alpha = 5u * (a - 128u);
+    else alpha = 0u;
+
+    imageStore(uDst, ivec2(id), vec4(1.0, 1.0, 1.0, float(alpha / 3u) / 255.0));
+}

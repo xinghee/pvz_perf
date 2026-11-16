@@ -1,0 +1,78 @@
+// UI-only adapter. The editor never accesses the live Board or shared actors.
+// All writes are validated by the existing isolated save tool while the game
+// is stopped. Source of the bundled editor: YuHao2006/PvzDevTools/saveEditor.
+import {ProfileStore,modes} from './save-codec.js';
+export function connectSaveEditor({module,root,ready,idle,running,setActive,authorize,sync,tools,lineups,library,onLineupsChanged,status}){
+ const button=document.getElementById('custom-save'),dialog=document.getElementById('save-editor-dialog'),frame=document.getElementById('save-editor-frame');
+ let documentText=null,granted=false,busy=false,opening=false;
+ const channel='pvz-save-editor-v1',origin=location.origin;
+ const names=()=>module.FS.readdir(root).filter(name=>/^game[1-9]\d*_\d+\.dat64$/.test(name)).sort();
+ const read=name=>{if(!/^game[1-9]\d*_\d+\.dat64$/.test(name)||!module.FS.analyzePath(root+'/'+name).exists)throw Error('没有可用的关卡 DAT64');const bytes=module.FS.readFile(root+'/'+name);if(bytes.length>32*1024*1024)throw Error('DAT64 超过 32 MiB');return bytes};
+ let store;
+ const listed=()=>({presets:library().snapshot().lineups,custom:[]});
+ const slot=name=>{const match=/^game([1-9]\d*)_(\d+)\.dat64$/.exec(name);if(!match||!modes[Number(match[2])]?.checkpoint)throw Error('文件名需为存在战斗存档的 game用户ID_模式编号.dat64，编号见对照页');const id=Number(match[1]);if(!store.rows().some(p=>p.id===id))throw Error('目标用户不存在，请先在“用户进度”页新增用户');return {id,mode:Number(match[2])}};
+ async function commit(plan){
+  const fs=module.FS,changed=new Set([...plan.writes.keys(),...plan.removes]),before=new Map();
+  for(const name of changed)before.set(name,fs.analyzePath(root+'/'+name).exists?fs.readFile(root+'/'+name).slice():null);
+  try{for(const [name,bytes] of plan.writes)fs.writeFile(root+'/'+name,bytes);for(const name of plan.removes)if(!plan.writes.has(name)&&fs.analyzePath(root+'/'+name).exists)fs.unlink(root+'/'+name);await sync()}
+  catch(error){for(const [name,bytes] of before){if(bytes)fs.writeFile(root+'/'+name,bytes);else if(fs.analyzePath(root+'/'+name).exists)fs.unlink(root+'/'+name)}try{await sync()}catch{}throw Error('用户修改未完成，已保留原始数据：'+error.message)}
+  return {id:plan.id,profiles:store.list(),saves:names()};
+ }
+ function send(value){frame.contentWindow?.postMessage({channel,...value},origin)}
+ async function initial(){const m=await lineups,entries=listed(),first=entries.presets[0];const lineup=first?await m.decodeLineup(first.code):{scene:2,rake:0,cells:Array(54).fill(0)};send({op:'init',payload:{gameHost:true,...entries,profiles:store.list(),saves:names(),code:first?first.code:await m.encodeLineup(lineup),lineup}})}
+ button.onclick=async()=>{
+  if(!ready()||!idle()||running()||opening||busy)return;
+  opening=true;button.disabled=true;setActive(true);
+  try{
+   await authorize();
+   store ||= new ProfileStore(module.FS,root);
+   // Toy wraps .html requests in its own viewer/password page, even for fetch.
+   // Load the editor as an ordinary JS resource and create an inherited-origin
+   // document. Never embed a second Toy page or collect its access password.
+   if(!documentText){documentText=(await import('./save-editor-document.js')).default;if(typeof documentText!=='string'||!documentText.includes(channel))throw Error('存档修改器资源无效，请重新加载页面')}
+   granted=true;dialog.showModal();
+   if(!frame.hasAttribute('srcdoc'))frame.srcdoc=documentText;else await initial();
+  }catch(error){granted=false;if(dialog.open)dialog.close();status(error.message||String(error))}
+  finally{opening=false;button.disabled=false;if(!dialog.open)setActive(false)}
+ };
+ dialog.addEventListener('cancel',event=>{if(busy)event.preventDefault()});
+ dialog.addEventListener('close',()=>{granted=false;setActive(false)});
+ window.addEventListener('message',async event=>{
+  if(event.source!==frame.contentWindow||event.origin!==origin||event.data?.channel!==channel||!granted||!dialog.open)return;
+  const {id,op,payload={}}=event.data;
+  if(op==='ready'){try{await initial()}catch(error){dialog.close();status(error.message)}return}
+  if(busy){send({id,error:'上一项存档操作尚未完成'});return}
+  busy=true;button.disabled=true;
+  try{
+   if(running()||!ready())throw Error('请先从游戏菜单退出，再修改存档');
+   let result={};const saveTools=await tools;
+   if(op==='close'){dialog.close()}
+   else if(op==='add-user')result=await commit(store.add({perfect:payload.perfect===true}));
+   else if(op==='edit-user')result=await commit(store.edit(payload));
+   else if(op==='delete-user')result=await commit(store.remove(payload.id));
+   else if(op==='delete-lineup'){
+    library().remove(payload.code);result=listed();onLineupsChanged();
+   }
+   else if(op==='save-lineup'){
+    const m=await lineups,decoded=await m.decodeLineup(payload.code),name=String(payload.name||'我的阵型').trim().slice(0,60);
+    library().add({name,code:decoded.code});result=listed();onLineupsChanged();
+   }
+   else if(op==='replace-lineups'){
+    const m=await lineups;if(payload?.format!==1||!Array.isArray(payload.lineups)||payload.lineups.length>2000)throw Error('阵型库 JSON 格式无效');
+    for(const entry of payload.lineups)await m.decodeLineup(entry.code);
+    library().replace(payload);result=listed();onLineupsChanged();
+   }
+   else if(op==='extract'){const target=slot(payload.name);await sync();result=await saveTools.runSaveTool({op:'extract',mode:target.mode},read(payload.name),store.details(target.id))}
+   else if(op==='generate'){
+    const name=payload.name||'game1_58.dat64',target=slot(name);
+    const r=payload.recipe;if(!r||!Array.isArray(r.cells)||r.cells.length!==54||r.cells.some(c=>!Number.isInteger(c)||c<0||c>65535||(c>>>10)>48))throw Error('阵型格子内容无效');
+    const m=await lineups,recipe=m.makeRecipe(r,r.flags,r.seed,r.scene,r.sun);
+    const generated=await saveTools.runSaveTool({op:'generate',mode:target.mode,recipe},null,store.details(target.id));if(!generated.bytes)throw Error('存档工具没有生成 DAT64');
+    module.FS.writeFile(root+'/'+name,generated.bytes);await sync();result={saves:names()};
+   }
+   else throw Error('不支持的存档操作');
+   send({id,result});
+  }catch(error){send({id,error:error.message||String(error)})}
+  finally{busy=false;button.disabled=false}
+ });
+}

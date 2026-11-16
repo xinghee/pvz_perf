@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {authorizeReward} from './game/rewards.js';
+const bvid='BV1hV4P6PEDc',config={bypassBilibiliChecks:false,rewardVideoBvid:bvid};
+let calls=0;
+await authorizeReward({bypassBilibiliChecks:true},async()=>{++calls;throw Error('Offline contacted SDK')});
+assert.equal(calls,0);
+await authorizeReward(config,async()=>({getAuthorRelation:async()=>({status:'ok',data:{isAuthor:true}}),getVideoUserActions:async()=>{throw Error('Author should bypass coin lookup')}}));
+const response=(coinCount,options={})=>({getAuthorRelation:async()=>({status:'ok',data:{isFollowing:true,isAuthor:false}}),getVideoUserActions:async req=>{assert.deepEqual(req.videos,[{bvid}]);return {status:'ok',items:[{bvid,status:'ok',coinCount,...options}]}}});
+await authorizeReward(config,async()=>response(2));
+for(const count of [0,1,undefined,null,'2',NaN])await assert.rejects(authorizeReward(config,async()=>response(count)),/两个币/);
+await assert.rejects(authorizeReward(config,async()=>response(2,{bvid:'BV0000000000'})),/两个币/);
+await assert.rejects(authorizeReward(config,async()=>response(2,{status:'denied'})),/两个币/);
+for(const status of ['unsupported','denied','not_login'])await assert.rejects(authorizeReward(config,async()=>({getAuthorRelation:async()=>({status,data:{isAuthor:true}}),getVideoUserActions:async()=>({status,items:[{bvid,status:'ok',coinCount:2}]})})),/无法验证/);
+await authorizeReward(config,async()=>({getAuthorRelation:async()=>{throw Error('Unavailable')},getVideoUserActions:async()=>({status:'ok',items:[{bvid,status:'ok',coinCount:2}]})}));
+await authorizeReward(config,async()=>({getVideoUserActions:async()=>({status:'partial',items:[{bvid,status:'ok',coinCount:2}]})}));
+await assert.rejects(authorizeReward({...config,rewardVideoBvid:''},async()=>response(2)),/BV/);
+console.log('PASS: author or two coins on the exact configured BV; following, one coin, wrong video and failed statuses do not grant saves; offline calls no SDK');

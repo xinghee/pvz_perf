@@ -1,0 +1,11 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Preserve archived measurements byte-for-byte so their recorded hashes survive checkout.
+/Tests/evidence/linux-wayland-20261018/* -text -whitespace
+/Tests/evidence/v324-microbenchmarks-20261101/** -text -whitespace
+/Tests/evidence/windows-vulkan-lp14-240-20261101/** -text -whitespace
+# Preserve vendor bytes covered by the development-tool SHA-256 manifest.
+tools/bin/windows-x64/** binary
+tools/bin/web/** binary
+pvzPerf/SexyAppFramework/platform/web/stb_vorbis.c -text
