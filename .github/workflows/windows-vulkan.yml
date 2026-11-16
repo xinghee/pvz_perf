@@ -62,6 +62,9 @@ jobs:
           repository: microsoft/vcpkg
           ref: ${{ steps.baseline.outputs.revision }}
           path: out/vcpkg
+          # Versioned ports need the real git tree; a shallow clone makes
+          # vcpkg fail with "read-tree <sha> failed" while installing zlib.
+          fetch-depth: 0
 
       - name: Bootstrap vcpkg
         shell: pwsh
