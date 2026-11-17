@@ -76,6 +76,25 @@ RECT ClientRect(HWND window) {
     if(!GetClientRect(window,&rect)) WindowFailure("GetClientRect");
     return rect;
 }
+// With an active scale chain the presenter centres and clips, it never rescales
+// (see VulkanRenderer::PresentRect). A window smaller than the prepared pipeline
+// output therefore crops the game instead of shrinking it, so the window geometry
+// has to match the pipeline. When the prepared output cannot fit the work area,
+// the borderless fullscreen path is the only mode whose chain targets the screen.
+bool DecoratedClientFitsWorkArea(const SexyAppBase& app, int width, int height) {
+    RECT work{};
+    if (!SystemParametersInfo(SPI_GETWORKAREA, 0, &work, 0))
+        return true;
+    const DWORD style = app.mHWnd ? DWORD(GetWindowLongPtrW(app.mHWnd, GWL_STYLE))
+        : (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME);
+    const DWORD exStyle = app.mHWnd ? DWORD(GetWindowLongPtrW(app.mHWnd, GWL_EXSTYLE)) : 0;
+    RECT rect{ 0, 0, width, height };
+    if (!NativeWindowsWindowApi::AdjustClientRect(rect, style, exStyle, app.mHWnd))
+        return true;
+    return rect.right - rect.left <= work.right - work.left &&
+        rect.bottom - rect.top <= work.bottom - work.top;
+}
+
 WindowTrackLimits WindowClientLimits(const SexyAppBase& app) {
     int height=600;
     if(app.mModernScalePrepared && app.IsScalePresentActiveForMode(true) &&
@@ -276,6 +295,14 @@ void SexyAppBase::ResizeWindowClient(int width,int height) {
             nativeStartupViewport.width,nativeStartupViewport.height,limits.height).width;
     width=limits.ConstrainWidth(width);
     height=limits.height;
+    if(!mNativeFullscreen && !DecoratedClientFitsWorkArea(*this,width,height)) {
+        // Anime4K x2 prepares 2134x1200 for a 1080p desktop: a windowed client
+        // that size would not fit, and shrinking only the window would crop the
+        // picture. Switch to the borderless fullscreen chain, which targets the
+        // desktop resolution and stays complete.
+        SetWindowFullscreen(true);
+        return;
+    }
     RECT rect{0,0,width,height};
     const auto style=DWORD(GetWindowLongPtrW(mHWnd,GWL_STYLE));
     const auto exStyle=DWORD(GetWindowLongPtrW(mHWnd,GWL_EXSTYLE));
