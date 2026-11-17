@@ -54,11 +54,11 @@ jobs:
             echo "no zip inside the artifact" >&2
             exit 1
           fi
-          if ! gh release view "$tag" >/dev/null 2>&1; then
-            gh release create "$tag" \
-              --title "pvz_perf $tag" \
-              --target "${GITHUB_SHA}" \
-              --notes "Automated build artifact. Extract over an existing install; keep your bass.dll, effects/ and data/."
-          fi
+          gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+            -f tag_name="$tag" \
+            -f name="pvz_perf $tag" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f body="Automated build artifact. Extract over an existing install; keep your bass.dll, effects/ and data/." \
+            >/dev/null 2>&1 || echo "release $tag already exists"
           gh release upload "$tag" "$zip" --clobber
           echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
