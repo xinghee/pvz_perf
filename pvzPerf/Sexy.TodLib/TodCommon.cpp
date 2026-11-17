@@ -8,6 +8,7 @@
 #include <deque>
 #include <future>
 #include <mutex>
+#include <vector>
 #include <utility>
 #include "TodDebug.h"
 #include "TodCommon.h"
@@ -463,13 +464,25 @@ void TodDrawStringMatrix(Graphics* g, const _Font* theFont, const SexyMatrix3& t
 	aFont->Prepare();
 	int aCurXPos = 0;
 	int aCurPoolIdx = 0;
-	for (int aCharNum = 0; aCharNum < (int)aFinalString.size(); aCharNum++)
+	// Matrix text is UTF-8 too; iterating bytes would draw one glyph per byte and
+	// advance three cells for every CJK character.
+	std::vector<char32_t> aCodepoints;
 	{
-		SexyChar aChar = aFont->GetMappedChar(aFinalString[aCharNum]);
-		SexyChar aNextChar = '\0';
-		if (aCharNum < (int)aFinalString.size() - 1)
+		size_t anOffset = 0;
+		while (anOffset < aFinalString.size())
 		{
-			aNextChar = aFont->GetMappedChar(aFinalString[aCharNum + 1]);
+			size_t aBytes = 1;
+			aCodepoints.push_back(Sexy::UTF8DecodeAt(aFinalString, anOffset, aBytes));
+			anOffset += aBytes;
+		}
+	}
+	for (size_t aCharNum = 0; aCharNum < aCodepoints.size(); aCharNum++)
+	{
+		const char32_t aChar = aFont->GetMappedChar(aCodepoints[aCharNum]);
+		char32_t aNextChar = '\0';
+		if (aCharNum + 1 < aCodepoints.size())
+		{
+			aNextChar = aFont->GetMappedChar(aCodepoints[aCharNum + 1]);
 		}
 
 		int aMaxXPos = aCurXPos;

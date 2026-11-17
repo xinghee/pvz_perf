@@ -439,8 +439,10 @@ void MessageWidget::DrawReanimatedText(Graphics* g, _Font* theFont, const Color&
 		aTransform.mTransX += aCenterOffsetX;
 		SexyMatrix3 aMatrix;
 		Reanimation::MatrixFromTransform(aTransform, aMatrix);
-		SexyString aLetter;
-		aLetter.append(1, mLabel[aPos]);
+		// One character, not one byte: a letter of a Chinese message is three bytes.
+		size_t aLetterBytes = 1;
+		Sexy::UTF8DecodeAt(aLabelText, aPos, aLetterBytes);
+		const SexyString aLetter(aLabelText, aPos, aLetterBytes);
 		TodDrawStringMatrix(g, theFont, aMatrix, aLetter, aFinalColor);
 	}
 }
