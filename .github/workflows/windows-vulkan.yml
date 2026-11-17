@@ -1,0 +1,145 @@
+name: Windows x64 Vulkan (PC)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'pc-*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-pc-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      VCPKG_DIR: ${{ github.workspace }}\out\vcpkg
+      VCPKG_INSTALLED_DIR: ${{ github.workspace }}\out\vcpkg_installed
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\out\vcpkg-bincache
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      VCPKG_MAX_CONCURRENCY: 4
+      BUILD_DIR: ${{ github.workspace }}\out\x64-win32-vulkan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: 1.3.296.0
+          install_runtime: true
+          cache: true
+
+      - name: Set up MSVC x64
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Read pinned vcpkg baseline
+        id: baseline
+        shell: pwsh
+        run: |
+          $baseline = (Get-Content vcpkg.json -Raw | ConvertFrom-Json).'builtin-baseline'
+          "revision=$baseline" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: win-x64-vcpkg-${{ steps.baseline.outputs.revision }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay-ports/**') }}
+          restore-keys: |
+            win-x64-vcpkg-${{ steps.baseline.outputs.revision }}-
+            win-x64-vcpkg-
+
+      - name: Check out vcpkg at pinned baseline
+        uses: actions/checkout@v4
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ steps.baseline.outputs.revision }}
+          path: out/vcpkg
+          # Versioned ports need the real git tree; a shallow clone makes
+          # vcpkg fail with "read-tree <sha> failed" while installing zlib.
+          fetch-depth: 0
+
+      - name: Bootstrap vcpkg
+        shell: pwsh
+        run: |
+          # The runner image exports VCPKG_ROOT for the Visual Studio copy of
+          # vcpkg, so keep our checkout in its own variable and hand it to CMake.
+          New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
+          & "$env:VCPKG_DIR\bootstrap-vcpkg.bat" -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Configure (Windows x64 Vulkan)
+        shell: pwsh
+        run: |
+          $env:VCPKG_ROOT = $env:VCPKG_DIR
+          cmake -S . -B "$env:BUILD_DIR" -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DPVZ_VCPKG_ROOT="$env:VCPKG_DIR" `
+            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
+            -DPVZ_WINDOW_BACKEND=WIN32 `
+            -DPVZ_WINDOWS_PLATFORM=WIN10 `
+            -DPVZ_RENDER_BACKEND=VULKAN `
+            -DPVZ_BUILD_FRAMEWORK_VULKAN=ON `
+            -DPVZ_BUILD_FRAMEWORK_D3D12=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build LawnProject
+        shell: pwsh
+        env:
+          VULKAN_SDK: ${{ env.VULKAN_SDK }}
+        run: |
+          cmake --build "$env:BUILD_DIR" --target LawnProject --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save vcpkg binary cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: win-x64-vcpkg-${{ steps.baseline.outputs.revision }}-${{ hashFiles('vcpkg.json', 'vcpkg-overlay-ports/**') }}
+
+      - name: Stage PC package
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path "$env:BUILD_DIR" -Recurse -Filter pvz_perf.exe | Select-Object -First 1
+          if (-not $exe) { throw "pvz_perf.exe not found under $env:BUILD_DIR" }
+          $runtime = $exe.Directory.FullName
+          Write-Host "Runtime directory: $runtime"
+
+          $dist = Join-Path $env:GITHUB_WORKSPACE 'dist\pvz_perf-pc-win64-vulkan'
+          New-Item -ItemType Directory -Force -Path $dist | Out-Null
+          Copy-Item -Path (Join-Path $runtime '*') -Destination $dist -Recurse -Force
+
+          # Runtime DXC DLLs come from the vcpkg directx-dxc package.
+          foreach ($dll in @('dxcompiler.dll', 'dxil.dll')) {
+            if (Test-Path (Join-Path $dist $dll)) { continue }
+            $found = Get-ChildItem -Path $env:VCPKG_INSTALLED_DIR -Recurse -Filter $dll -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { Copy-Item $found.FullName -Destination (Join-Path $dist $dll) -Force }
+            else { Write-Warning "$dll not staged (copy it from your existing install)" }
+          }
+
+          if (-not (Test-Path (Join-Path $dist 'scale.json'))) {
+            Copy-Item -Path 'scale.json' -Destination (Join-Path $dist 'scale.json') -Force
+          }
+
+          # Save data / pak / bass are user-supplied; never ship benchmark saves.
+          $shipped = Get-ChildItem $dist -Recurse -File | Where-Object { $_.Name -match '\.dat64?$' -or $_.Name -eq 'users.dat' }
+          foreach ($f in $shipped) { Remove-Item $f.FullName -Force }
+
+          Get-ChildItem $dist | Select-Object Name, Length | Format-Table -AutoSize | Out-String | Write-Host
+          Compress-Archive -Path (Join-Path $dist '*') -DestinationPath 'dist\pvz_perf-pc-win64-vulkan.zip' -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pvz_perf-pc-win64-vulkan
+          path: dist/pvz_perf-pc-win64-vulkan.zip
+          if-no-files-found: error
+          retention-days: 30
