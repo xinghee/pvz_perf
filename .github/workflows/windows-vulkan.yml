@@ -2,12 +2,21 @@ name: Windows x64 Vulkan (PC)
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Attach the package to a GitHub Release'
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Release tag (defaults to zh-preview)'
+        type: string
+        default: ''
   push:
     tags:
       - 'pc-*'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-pc-${{ github.ref }}
@@ -143,3 +152,22 @@ jobs:
           path: dist/pvz_perf-pc-win64-vulkan.zip
           if-no-files-found: error
           retention-days: 30
+
+      # The asset is uploaded from the runner: it already sits next to the build,
+      # so this works even when the local link to GitHub is too slow to fetch it.
+      - name: Publish release asset
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ inputs.release_tag }}"
+          if (-not $tag) { $tag = 'zh-preview' }
+          $zip = 'dist/pvz_perf-pc-win64-vulkan.zip'
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "pvz_perf $tag" --target $env:GITHUB_SHA `
+              --notes "Automated build of $env:GITHUB_SHA. Extract over an existing install; bass.dll, effects/ and data/ are yours to keep."
+          }
+          gh release upload $tag $zip --clobber
+          Write-Host "Release: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
