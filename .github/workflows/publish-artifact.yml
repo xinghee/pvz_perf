@@ -1,0 +1,64 @@
+name: Publish built package to a release
+
+# Moves an already-built artifact onto a GitHub Release from the runner, so a
+# slow local link to GitHub is not in the path. No compilation happens here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Build run id that owns the artifact'
+        required: true
+        type: string
+      release_tag:
+        description: 'Release tag (defaults to zh-preview)'
+        type: string
+        default: ''
+      artifact_name:
+        description: 'Artifact name'
+        type: string
+        default: pvz_perf-pc-win64-vulkan
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ inputs.release_tag }}
+      RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - name: Fetch the built artifact from the build run
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: pkg
+
+      - name: Show what was fetched
+        run: |
+          ls -la pkg
+          find pkg -maxdepth 2 -type f -printf '%p %s\n' | head
+
+      - name: Create the release if needed, then upload
+        run: |
+          set -euo pipefail
+          tag="${TAG:-zh-preview}"
+          zip="$(find pkg -name '*.zip' -type f | head -1)"
+          if [ -z "$zip" ]; then
+            echo "no zip inside the artifact" >&2
+            exit 1
+          fi
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" \
+              --title "pvz_perf $tag" \
+              --target "${GITHUB_SHA}" \
+              --notes "Automated build artifact. Extract over an existing install; keep your bass.dll, effects/ and data/."
+          fi
+          gh release upload "$tag" "$zip" --clobber
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
