@@ -10,6 +10,8 @@
 #endif
 #include "paklib/PakInterface.h"
 #include "Sexy.TodLib/TodCommon.h"
+#include "Sexy.TodLib/generated/CjkFontData.h"
+#include <cctype>
 #include <cassert>
 #include <array>
 #include <cmath>
@@ -240,14 +242,14 @@ FontLayer::FontLayer(const FontLayer& theFontLayer) :
 	// @Minerscale mUseAlphaCorrection wasn't initialised in the copy constructor causing UB
 	mUseAlphaCorrection(theFontLayer.mUseAlphaCorrection)
 {
-	std::copy(std::begin(theFontLayer.mCharData), std::end(theFontLayer.mCharData), std::begin(mCharData));
+	mCharData = theFontLayer.mCharData;
 }
 
 CharData* FontLayer::GetCharData(char32_t theChar)
 {
-	const unsigned aIndex = static_cast<unsigned char>(theChar);
-	assert(aIndex < kCharSlots);
-	return &mCharData[aIndex];
+	// Missing characters get a zero-width entry: the caller then draws nothing
+	// but still advances by the character, which is what the old slot array did.
+	return &mCharData[theChar];
 }
 
 int CharData::GetKerning(char32_t theNextChar) const
@@ -955,9 +957,8 @@ bool FontData::HandleCommand(const ListDataElement& theParams)
 						//for (int aCharNum = 0; aCharNum < 256; aCharNum++)
 						//	if (aLayer->mCharData[aCharNum].mImageRect.mHeight + aLayer->mCharData[aCharNum].mOffset.mY > aLayer->mDefaultHeight)
 						//		aLayer->mDefaultHeight = aLayer->mCharData[aCharNum].mImageRect.mHeight + aLayer->mCharData[aCharNum].mOffset.mY;
-						for (int aCharIdx = 0; aCharIdx < aLayer->kCharSlots; aCharIdx++)
+						for (const auto& [aCharIdx, aCharData] : aLayer->mCharData)
 						{
-							CharData& aCharData = aLayer->mCharData[aCharIdx];
 							if (aCharData.mImageRect.mHeight + aCharData.mOffset.mY > aLayer->mDefaultHeight)
 							{
 								aLayer->mDefaultHeight = aCharData.mImageRect.mHeight + aCharData.mOffset.mY;
@@ -1339,12 +1340,14 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 	}
 	FontLayerList layers;
 	std::vector<std::string> imagePaths;
-	std::vector<std::array<Rect,FontLayer::kCharSlots>> glyphPixelRectangles;
+	std::vector<std::vector<Rect>> glyphPixelRectangles;
+	std::vector<std::vector<char32_t>> glyphKeys;
 	std::vector<unsigned> layerIds;
 	for (unsigned i = 0; i < layerCount; ++i)
 	{
 		layers.emplace_back(this);
 		glyphPixelRectangles.emplace_back();
+		glyphKeys.emplace_back();
 		auto& layer = layers.back();
 		layer.mLayerId = reader.UInt();
 		if (layer.mLayerId >= layerCount
@@ -1374,8 +1377,10 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 			const unsigned ch = reader.UInt();
 			if (ch >= FontLayer::kCharSlots || seen[ch]) return false;
 			seen[ch] = true;
-			auto& glyph = layer.mCharData[ch];
-			auto& rectangle=glyphPixelRectangles.back()[ch];
+			auto& glyph = layer.mCharData[static_cast<char32_t>(ch)];
+			glyphKeys.back().push_back(static_cast<char32_t>(ch));
+			glyphPixelRectangles.back().emplace_back();
+			auto& rectangle=glyphPixelRectangles.back().back();
 			rectangle.mX = reader.Int(); rectangle.mY = reader.Int();
 			rectangle.mWidth = reader.Int(); rectangle.mHeight = reader.Int();
 			glyph.mOffset.mX = reader.Int(); glyph.mOffset.mY = reader.Int();
@@ -1402,9 +1407,10 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 		layer.mImage = theSexyApp->GetPreparedSharedImage(imagePath, 0, nullptr, {});
 		if (static_cast<Image*>(layer.mImage) == nullptr ||
 			layer.mImage->mWidth<=0 || layer.mImage->mHeight<=0) return false;
-		for (int ch=0;ch<FontLayer::kCharSlots;++ch)
+		for (size_t gi=0;gi<glyphKeys[index].size();++gi)
 		{
-			const auto& rect = glyphPixelRectangles[index][ch];
+			const char32_t ch = glyphKeys[index][gi];
+			const auto& rect = glyphPixelRectangles[index][gi];
 			if (rect.mX < 0 || rect.mY < 0 || rect.mWidth < 0 || rect.mHeight < 0
 				|| static_cast<long long>(rect.mX) + rect.mWidth > layer.mImage->mWidth
 				|| static_cast<long long>(rect.mY) + rect.mHeight > layer.mImage->mHeight) return false;
@@ -1422,8 +1428,63 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 	mDefaultPointSize = pointSize;
 	mApp = theSexyApp;
 	mSourceFile.swap(path);
+	ApplyCjkGlyphs();
 	mInitialized = true;
 	return true;
+}
+
+void FontData::ApplyCjkGlyphs()
+{
+	if (mFontLayerList.empty() || mSourceFile.empty())
+		return;
+
+	// "compiled/fonts/briannetod12.compiled" -> "briannetod12"
+	std::string aStem = mSourceFile;
+	const size_t aSlash = aStem.find_last_of("/\\");
+	if (aSlash != std::string::npos)
+		aStem.erase(0, aSlash + 1);
+	const size_t aDot = aStem.find_last_of('.');
+	if (aDot != std::string::npos)
+		aStem.erase(aDot);
+	for (char& aChar : aStem)
+		aChar = static_cast<char>(std::tolower(static_cast<unsigned char>(aChar)));
+
+	const CjkFontTable* aTable = FindCjkFontTable(aStem.c_str());
+	if (aTable == nullptr)
+		return;
+
+	// Only the Main layer carries the baked glyphs; outline layers keep their
+	// Latin range and simply draw nothing for a character they do not own.
+	FontLayer* aLayer = &mFontLayerList.front();
+	if (aLayer->mImage == nullptr)
+		return;
+	const int aImageWidth = aLayer->mImage->mWidth;
+	const int aImageHeight = aLayer->mImage->mHeight;
+	if (aImageWidth <= 0 || aImageHeight <= 0)
+		return;
+
+	for (int i = 0; i < aTable->mCount; i++)
+	{
+		const CjkGlyphRecord& aRecord = aTable->mRecords[i];
+		if (aRecord.mX < 0 || aRecord.mY < 0
+			|| aRecord.mX + aRecord.mWidth > aImageWidth
+			|| aRecord.mY + aRecord.mHeight > aImageHeight)
+			continue;
+
+		CharData& aGlyph = aLayer->mCharData[static_cast<char32_t>(aRecord.mCodepoint)];
+		aGlyph.mImageRect = {
+			float(aRecord.mX) / aImageWidth, float(aRecord.mY) / aImageHeight,
+			float(aRecord.mX + aRecord.mWidth) / aImageWidth,
+			float(aRecord.mY + aRecord.mHeight) / aImageHeight,
+			aRecord.mWidth, aRecord.mHeight};
+		aGlyph.mOffset = Point(aRecord.mOffsetX, aRecord.mOffsetY);
+		aGlyph.mWidth = aRecord.mAdvance;
+		aGlyph.mOrder = aRecord.mOrder;
+
+		const int aGlyphHeight = aRecord.mHeight + aRecord.mOffsetY;
+		if (aGlyphHeight > aLayer->mDefaultHeight)
+			aLayer->mDefaultHeight = aGlyphHeight;
+	}
 }
 
 ////
@@ -1439,8 +1500,7 @@ ActiveFontLayer::ActiveFontLayer(const ActiveFontLayer& theActiveFontLayer) :
 	mScaledImage(theActiveFontLayer.mScaledImage),
 	mOwnsImage(theActiveFontLayer.mOwnsImage)
 {
-	std::copy(std::begin(theActiveFontLayer.mScaledCharImageRects),
-		std::end(theActiveFontLayer.mScaledCharImageRects), std::begin(mScaledCharImageRects));
+	mScaledCharImageRects = theActiveFontLayer.mScaledCharImageRects;
 	// Owned GPU atlases retain the same rectangle map; duplication is GPU-only.
 	if (mOwnsImage)
 		mScaledImage = new Image(*static_cast<Image*>(theActiveFontLayer.mScaledImage));
@@ -1450,6 +1510,13 @@ ActiveFontLayer::~ActiveFontLayer()
 {
 	if (mOwnsImage)
 		delete static_cast<Image*>(mScaledImage);
+}
+
+const TextureRegion& ActiveFontLayer::GetScaledCharRect(char32_t theChar) const
+{
+	static const TextureRegion sEmpty{};
+	const auto anItr = mScaledCharImageRects.find(theChar);
+	return anItr == mScaledCharImageRects.end() ? sEmpty : anItr->second;
 }
 
 ////
@@ -1604,11 +1671,11 @@ void ImageFont::GenerateActiveFontLayers()
 
 					//for (int aCharNum = 0; aCharNum < 256; aCharNum++)
 					//	anActiveFontLayer->mScaledCharImageRects[aCharNum] = aFontLayer->GetCharData(aCharNum)->mImageRect;aFontLayer->mCharData[aCharNum].mImageRect;
-					for (int aCharNum = 0; aCharNum < aFontLayer->kCharSlots; aCharNum++)
+					for (const auto& [aCharNum, aCharData] : aFontLayer->mCharData)
 					{
-						if (aFontLayer->mCharData[aCharNum].mWidth == 0)
-							continue;  // 未注册字符（与 map 版只含已注册键等价）
-						anActiveFontLayer->mScaledCharImageRects[aCharNum] = aFontLayer->mCharData[aCharNum].mImageRect;
+						if (aCharData.mWidth == 0)
+							continue;
+						anActiveFontLayer->mScaledCharImageRects[aCharNum] = aCharData.mImageRect;
 					}
 				}
 				else
@@ -1623,12 +1690,12 @@ void ImageFont::GenerateActiveFontLayers()
 
 					int aCurX = 0;
 					int aMaxHeight = 0;
-					std::array<Rect,FontLayer::kCharSlots> aScaledRectangles{};
-					for (int aCharNum = 0; aCharNum < aFontLayer->kCharSlots; aCharNum++)
+					std::map<char32_t, Rect> aScaledRectangles;
+					for (const auto& [aCharNum, aCharData] : aFontLayer->mCharData)
 					{
-						if (aFontLayer->mCharData[aCharNum].mWidth == 0)
+						if (aCharData.mWidth == 0)
 							continue;
-						const auto& anOrigRect = aFontLayer->mCharData[aCharNum].mImageRect;
+						const auto& anOrigRect = aCharData.mImageRect;
 
 						Rect aScaledRect(aCurX, 0,
 							(int)((anOrigRect.mWidth * aPointSize) / aLayerPointSize),
@@ -1649,12 +1716,12 @@ void ImageFont::GenerateActiveFontLayers()
 					anActiveFontLayer->mScaledImage=aMemoryImage;
 					anActiveFontLayer->mOwnsImage=true;
 					std::vector<GpuFontGlyph> glyphs;
-					glyphs.reserve(aFontLayer->kCharSlots);
-					for (int aCharNum = 0; aCharNum < aFontLayer->kCharSlots; aCharNum++)
+					glyphs.reserve(aFontLayer->mCharData.size());
+					for (const auto& [aCharNum, aCharData] : aFontLayer->mCharData)
 					{
-						if (aFontLayer->mCharData[aCharNum].mWidth == 0)
+						if (aCharData.mWidth == 0)
 							continue;
-						const auto& source=aFontLayer->mCharData[aCharNum].mImageRect;
+						const auto& source=aCharData.mImageRect;
 						const auto& target=aScaledRectangles[aCharNum];
 						anActiveFontLayer->mScaledCharImageRects[aCharNum] = {
 							float(target.mX) / aCurX, float(target.mY) / aMaxHeight,
@@ -1930,7 +1997,7 @@ void ImageFont::DrawStringEx(Graphics* g, int theX, int theY, const SexyString& 
 			aRenderCommand->mColor = aColor;
 			aRenderCommand->mDest[0] = anImageX;
 			aRenderCommand->mDest[1] = anImageY;
-			aRenderCommand->mSourceRegion = anActiveFontLayer->mScaledCharImageRects[static_cast<std::size_t>(static_cast<unsigned char>(aChar))];
+			aRenderCommand->mSourceRegion = anActiveFontLayer->GetScaledCharRect(aChar);
 			aRenderCommand->mMode = anActiveFontLayer->mBaseFontLayer->mDrawMode;
 			aRenderCommand->mNext = NULL;
 
@@ -1955,14 +2022,15 @@ void ImageFont::DrawStringEx(Graphics* g, int theX, int theY, const SexyString& 
 			Color anOrigColor = g->mColor;
 			g->mColor = aColor;
 			if (anActiveFontLayer->mScaledImage != NULL)
-				g->DrawImage(anActiveFontLayer->mScaledImage, anImageX, anImageY, anActiveFontLayer->mScaledCharImageRects[static_cast<std::size_t>(static_cast<unsigned char>(aChar))]);
+				g->DrawImage(anActiveFontLayer->mScaledImage, anImageX, anImageY, anActiveFontLayer->GetScaledCharRect(aChar));
 			g->mColor = anOrigColor;
 			g->mDrawMode = anOldDrawMode;*/
 
 			if (theDrawnAreas != NULL)
 			{
 				//Rect aDestRect = Rect(anImageX, anImageY, anActiveFontLayer->mScaledCharImageRects[(uchar) aChar].mWidth, anActiveFontLayer->mScaledCharImageRects[(uchar) aChar].mHeight);
-				Rect aDestRect(anImageX, anImageY, anActiveFontLayer->mScaledCharImageRects[static_cast<std::size_t>(static_cast<unsigned char>(aChar))].mWidth, anActiveFontLayer->mScaledCharImageRects[static_cast<std::size_t>(static_cast<unsigned char>(aChar))].mHeight);
+				const TextureRegion& aScaledRegion = anActiveFontLayer->GetScaledCharRect(aChar);
+				Rect aDestRect(anImageX, anImageY, aScaledRegion.mWidth, aScaledRegion.mHeight);
 
 				theDrawnAreas->push_back(aDestRect);
 

@@ -539,7 +539,7 @@ void TodDrawStringMatrix(Graphics* g, const _Font* theFont, const SexyMatrix3& t
 			aRenderCommand->mDest[1] = anImageY;
 			// 1073 0051DC50 caches an empty region for a missing glyph,
 			// without skipping its metrics/spacing.
-			aRenderCommand->mSourceRegion = aKernItr->mScaledCharImageRects[static_cast<std::size_t>(static_cast<unsigned char>(aChar))];
+			aRenderCommand->mSourceRegion = aKernItr->GetScaledCharRect(aChar);
 			aRenderCommand->mMode = aLayer->mDrawMode;
 			aRenderCommand->mUseAlphaCorrection = aLayer->mUseAlphaCorrection;
 			aRenderCommand->mNext = nullptr;

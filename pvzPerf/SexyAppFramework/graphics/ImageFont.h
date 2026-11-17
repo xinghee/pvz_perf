@@ -50,9 +50,11 @@ public:
 	unsigned				mLayerId = 0;
 	std::vector<unsigned>	mRequiredTags;
 	std::vector<unsigned>	mExcludedTags;
-	// ASCII characters index their own slots directly; other bytes are invalid.
+	// Capacity of one layer inside the compiled font format (.compiledNFNT).
 	static constexpr int kCharSlots = 128;
-	CharData				mCharData[kCharSlots];
+	// Keyed by code point: ASCII keeps its old slots one-to-one, CJK simply adds
+	// entries the compiled font format cannot carry.
+	std::map<char32_t, CharData> mCharData;
 	Color					mColorMult;
 	Color					mColorAdd;
 	SharedImageRef			mImage;	
@@ -119,6 +121,9 @@ public:
 	void					DeRef();
 
 	bool					Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileName);
+	// Merges the CJK metrics compiled into the executable (see CjkFontData.h);
+	// the compiled font file itself can only carry ASCII glyphs.
+	void					ApplyCjkGlyphs();
 };
 
 
@@ -129,12 +134,14 @@ public:
 
 	Image*					mScaledImage;
 	bool					mOwnsImage;
-	// Scaled UV regions use the same ASCII slot domain as FontLayer.
-	TextureRegion			mScaledCharImageRects[128];
+	// Scaled UV regions follow FontLayer's code point keys.
+	std::map<char32_t, TextureRegion> mScaledCharImageRects;
 
 public:
 	ActiveFontLayer();
 	ActiveFontLayer(const ActiveFontLayer& theActiveFontLayer);
+	// An unmapped character yields an empty region, matching the cached-font path.
+	const TextureRegion&	GetScaledCharRect(char32_t theChar) const;
 	ActiveFontLayer& operator=(const ActiveFontLayer& theActiveFontLayer) = delete;
 	~ActiveFontLayer();
 };

@@ -163,6 +163,7 @@ set(TodLib__Common__TodCommon_Source
     "../Sexy.TodLib/TodAllocator.cpp"
     "../Sexy.TodLib/TodStringFile.cpp"
     "../Sexy.TodLib/generated/LawnStrings.cpp"
+    "../Sexy.TodLib/generated/CjkFontData.cpp"
     ${PVZ_STATIC_DEFINITION_SOURCES}
     "../Sexy.TodLib/generated/EntityStrings.cpp"
     "../Sexy.TodLib/generated/DaveDialogueMetadata.cpp"
