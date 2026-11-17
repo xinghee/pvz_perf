@@ -75,6 +75,7 @@ bool UTF8DecodeNext(const std::string& theString, size_t& theOffset, char32_t& o
 	theOffset += aExtra + 1;
 	return true;
 }
+}  // namespace
 
 #if defined(SEXY_FONT_TEXT_COMPAT_TEST_ONLY)
 namespace {
