@@ -388,7 +388,7 @@ void MessageWidget::Update(std::int64_t nowNs)
 			}
 			aTextReanim->ApplyRate(TodAnimateCurveNs(0, 500'000'000,
 				(mSlideDurationNs - remainingNs) * aTextSpeed -
-					std::int64_t(aPos) * 10'000'000, 0.0f, 40.0f, Curves::Linear));
+					std::int64_t(aCharIndex) * 10'000'000, 0.0f, 40.0f, Curves::Linear));
 		}
 
 		aTextReanim->UpdateAt(nowNs, Sexy::gUpdateIntervalNs);  //更新动画
@@ -406,11 +406,24 @@ void MessageWidget::DrawReanimatedText(Graphics* g, _Font* theFont, const Color&
 		: 0.0f;
 	const auto remainingNs = mEndTimeNs == INT64_MAX ? 100'000'000'000 :
 		std::max<std::int64_t>(0, mEndTimeNs - static_cast<std::int64_t>(mApp->mBoard->mLevelTimeNs));
-	// 动画按字符建立，这里也必须按字符数遍历。
-	const int aLabelLen = static_cast<int>(Utf8CharCount(mLabel));
-	for (int aPos = 0; aPos < aLabelLen; aPos++)
+	// 动画按字符建立，这里也必须按字符遍历；aCharStarts 把字符序号映射到字节偏移，
+	// 供下面切出单个字符。
+	const SexyString aLabelText(mLabel);
+	std::vector<size_t> aCharStarts;
 	{
-		Reanimation* aTextReanim = mApp->ReanimationTryToGet(mTextReanimID[aPos]);
+		size_t anOffset = 0;
+		while (anOffset < aLabelText.size())
+		{
+			aCharStarts.push_back(anOffset);
+			size_t aBytes = 1;
+			Sexy::UTF8DecodeAt(aLabelText, anOffset, aBytes);
+			anOffset += aBytes;
+		}
+	}
+	for (size_t aCharIndex = 0; aCharIndex < aCharStarts.size(); aCharIndex++)
+	{
+		const size_t aPos = aCharStarts[aCharIndex];
+		Reanimation* aTextReanim = mApp->ReanimationTryToGet(mTextReanimID[aCharIndex]);
 		if (aTextReanim == nullptr)
 		{
 			break;  // 当不存在文本动画时，跳出循环，直接返回
