@@ -27,14 +27,14 @@ public:
 	Point					mOffset;
 	// 字距对表（本字形 → 后继字符修正）。每字形通常 0~几对，线性扫；
 	// map 版已删（ASCII 直取阵列改造，2026-10-01）。
-	std::vector<std::pair<SexyChar, int>> mKerningPairs;
+	std::vector<std::pair<char32_t, int>> mKerningPairs;
 	int						mWidth;
 	int						mOrder;
 
 public:
 	CharData();
-	int						GetKerning(SexyChar theNextChar) const;
-	void					SetKerning(SexyChar theNextChar, int theOffset);
+	int						GetKerning(char32_t theNextChar) const;
+	void					SetKerning(char32_t theNextChar, int theOffset);
 };
 
 class FontData;
@@ -74,10 +74,10 @@ public:
 	FontLayer(FontData* theFontData);
 	FontLayer(const FontLayer& theFontLayer);
 
-	CharData*				GetCharData(SexyChar theChar);
+	CharData*				GetCharData(char32_t theChar);
 };
 
-typedef std::map<SexyChar, SexyChar> CharMap;
+typedef std::map<char32_t, char32_t> CharMap;
 typedef std::list<FontLayer> FontLayerList;
 #if defined(SEXY_FONT_TEXT_COMPAT_TEST_ONLY)
 typedef std::map<std::string, FontLayer*> FontLayerMap;
@@ -182,8 +182,8 @@ public:
 	ImageFont(Image* theFontImage, const std::string& theFontDescFileName);
 #endif
 	
-	virtual int				CharWidth(SexyChar theChar);
-	virtual int				CharWidthKern(SexyChar theChar, SexyChar thePrevChar);
+	virtual int				CharWidth(char32_t theChar);
+	virtual int				CharWidthKern(char32_t theChar, char32_t thePrevChar);
 	virtual int				StringWidth(const SexyString& theString);
 	virtual void			DrawString(Graphics* g, int theX, int theY, const SexyString& theString, const Color& theColor, const Rect& theClipRect);
 
@@ -199,7 +199,7 @@ public:
 #endif
 
 	void			Prepare();
-	SexyChar				GetMappedChar(SexyChar theChar);
+	char32_t				GetMappedChar(char32_t theChar);
 };
 
 }

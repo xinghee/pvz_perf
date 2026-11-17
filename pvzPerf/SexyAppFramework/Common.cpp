@@ -1231,6 +1231,37 @@ bool Sexy::StrPrefixNoCase(const char *theStr, const char *thePrefix, int maxLen
 	return c2==0 || i==maxLength;
 }
 
+char32_t Sexy::UTF8DecodeAt(const std::string& theString, size_t theOffset, size_t& outByteLength)
+{
+	outByteLength = 1;
+	if (theOffset >= theString.size())
+		return 0;
+
+	const unsigned char aFirst = static_cast<unsigned char>(theString[theOffset]);
+	if (aFirst < 0x80)
+		return aFirst;
+
+	size_t aExtra = 0;
+	char32_t aValue = 0;
+	if ((aFirst & 0xE0) == 0xC0)      { aValue = aFirst & 0x1F; aExtra = 1; }
+	else if ((aFirst & 0xF0) == 0xE0) { aValue = aFirst & 0x0F; aExtra = 2; }
+	else if ((aFirst & 0xF8) == 0xF0) { aValue = aFirst & 0x07; aExtra = 3; }
+	else
+		return 0xFFFD;
+
+	if (theOffset + aExtra >= theString.size())
+		return 0xFFFD;
+	for (size_t i = 1; i <= aExtra; i++)
+	{
+		const unsigned char aCont = static_cast<unsigned char>(theString[theOffset + i]);
+		if ((aCont & 0xC0) != 0x80)
+			return 0xFFFD;
+		aValue = (aValue << 6) | (aCont & 0x3F);
+	}
+	outByteLength = aExtra + 1;
+	return aValue;
+}
+
 std::wstring Sexy::UTF8StringToWString(const std::string& theString)
 {
 #ifdef _WIN32

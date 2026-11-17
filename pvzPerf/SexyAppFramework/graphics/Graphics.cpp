@@ -1195,8 +1195,8 @@ static int WriteWordWrappedLayout(Graphics* graphics,_Font& font,bool colored,co
 	unsigned int aCurPos = 0;
 	int aLineStartPos = 0;
 	int aCurWidth = 0;
-	SexyChar aCurChar = 0;
-	SexyChar aPrevChar = 0;
+	char32_t aCurChar = 0;
+	char32_t aPrevChar = 0;
 	int aSpacePos = -1;
 	int aMaxWidth = 0;
 	int anIndentX = 0;
@@ -1209,7 +1209,8 @@ static int WriteWordWrappedLayout(Graphics* graphics,_Font& font,bool colored,co
 
 	while (aCurPos < theLine.length())
 	{	
-		aCurChar = theLine[aCurPos];
+		size_t aCharBytes = 1;
+		aCurChar = UTF8DecodeAt(theLine, aCurPos, aCharBytes);
 		if(aCurChar==('^') && mWriteColoredString) // Handle special color modifier
 		{
 			if(aCurPos+1<theLine.length())
@@ -1229,7 +1230,7 @@ static int WriteWordWrappedLayout(Graphics* graphics,_Font& font,bool colored,co
 		{
 			aCurWidth = theRect.mWidth+1; // force word wrap
 			aSpacePos = aCurPos;
-			aCurPos++; // skip enter on next go round
+			aCurPos += aCharBytes; // skip enter on next go round
 		}
 
 		aCurWidth += aFont->CharWidthKern(aCurChar, aPrevChar);
@@ -1270,7 +1271,7 @@ static int WriteWordWrappedLayout(Graphics* graphics,_Font& font,bool colored,co
 			else
 			{
 				if((int)aCurPos<aLineStartPos+1)
-					aCurPos++; // ensure at least one character gets written
+					aCurPos += aCharBytes; // ensure at least one character gets written
 
 				aWrittenWidth = WriteWordWrappedHelper(graphics,font,colored, theLine, theRect.mX + anIndentX, theRect.mY + aYOffset, theRect.mWidth,
 					theJustification, DrawText, aLineStartPos, aCurPos-aLineStartPos, anOrigColorInt, theMaxChars);
@@ -1295,7 +1296,7 @@ static int WriteWordWrappedLayout(Graphics* graphics,_Font& font,bool colored,co
 			aYOffset += theLineSpacing;
 		}
 		else
-			aCurPos++;
+			aCurPos += aCharBytes;
 	}
 
 	if(aLineStartPos<(int)theLine.length()) // write the last piece

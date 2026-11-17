@@ -29,8 +29,8 @@ public:
 	int				GetDescent() { return mHeight - mAscent; }
 	int				GetLineSpacing() { return mHeight + mLineSpacingOffset; }
 	virtual int				StringWidth(const SexyString& theString);
-	virtual int				CharWidth(SexyChar theChar);
-	virtual int				CharWidthKern(SexyChar theChar, SexyChar thePrevChar);
+	virtual int				CharWidth(char32_t theChar);
+	virtual int				CharWidthKern(char32_t theChar, char32_t thePrevChar);
 
 	virtual void			DrawString(Graphics* g, int theX, int theY, const SexyString& theString, const Color& theColor, const Rect& theClipRect);
 

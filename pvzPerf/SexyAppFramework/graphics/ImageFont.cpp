@@ -16,7 +16,65 @@
 #include <memory>
 #include <utility>
 
-using namespace Sexy;
+using namespace Sexy
+{
+
+// Glyph tables are keyed by Unicode code point while UI text stays UTF-8, so
+// measuring and drawing have to walk code points rather than bytes; otherwise a
+// three-byte CJK character would be measured and drawn as three glyphs.
+namespace
+{
+bool UTF8DecodeNext(const std::string& theString, size_t& theOffset, char32_t& outChar)
+{
+	const size_t aSize = theString.size();
+	if (theOffset >= aSize)
+		return false;
+
+	const unsigned char aFirst = static_cast<unsigned char>(theString[theOffset]);
+	if (aFirst < 0x80)
+	{
+		outChar = aFirst;
+		theOffset += 1;
+		return true;
+	}
+
+	size_t aExtra = 0;
+	char32_t aValue = 0;
+	if ((aFirst & 0xE0) == 0xC0)      { aValue = aFirst & 0x1F; aExtra = 1; }
+	else if ((aFirst & 0xF0) == 0xE0) { aValue = aFirst & 0x0F; aExtra = 2; }
+	else if ((aFirst & 0xF8) == 0xF0) { aValue = aFirst & 0x07; aExtra = 3; }
+	else
+	{
+		// Invalid leading byte: consume it as a replacement character so callers
+		// always make progress.
+		outChar = 0xFFFD;
+		theOffset += 1;
+		return true;
+	}
+
+	if (theOffset + aExtra >= aSize)
+	{
+		outChar = 0xFFFD;
+		theOffset = aSize;
+		return true;
+	}
+	for (size_t i = 1; i <= aExtra; i++)
+	{
+		const unsigned char aCont = static_cast<unsigned char>(theString[theOffset + i]);
+		if ((aCont & 0xC0) != 0x80)
+		{
+			outChar = 0xFFFD;
+			theOffset += 1;
+			return true;
+		}
+		aValue = (aValue << 6) | (aCont & 0x3F);
+	}
+	outChar = aValue;
+	theOffset += aExtra + 1;
+	return true;
+}
+}
+;
 
 #if defined(SEXY_FONT_TEXT_COMPAT_TEST_ONLY)
 namespace {
@@ -187,14 +245,14 @@ FontLayer::FontLayer(const FontLayer& theFontLayer) :
 	std::copy(std::begin(theFontLayer.mCharData), std::end(theFontLayer.mCharData), std::begin(mCharData));
 }
 
-CharData* FontLayer::GetCharData(SexyChar theChar)
+CharData* FontLayer::GetCharData(char32_t theChar)
 {
 	const unsigned aIndex = static_cast<unsigned char>(theChar);
 	assert(aIndex < kCharSlots);
 	return &mCharData[aIndex];
 }
 
-int CharData::GetKerning(SexyChar theNextChar) const
+int CharData::GetKerning(char32_t theNextChar) const
 {
 	for (const auto& aPair : mKerningPairs)
 		if (aPair.first == theNextChar)
@@ -202,7 +260,7 @@ int CharData::GetKerning(SexyChar theNextChar) const
 	return 0;  // map 版 operator[] miss 插 0 的等价读语义
 }
 
-void CharData::SetKerning(SexyChar theNextChar, int theOffset)
+void CharData::SetKerning(char32_t theNextChar, int theOffset)
 {
 	for (auto& aPair : mKerningPairs)
 		if (aPair.first == theNextChar)
@@ -1279,7 +1337,7 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 	{
 		const unsigned from = reader.UInt(), to = reader.UInt();
 		if (!reader.valid || from > 255 || to > 255
-			|| !charMap.emplace(static_cast<SexyChar>(from), static_cast<SexyChar>(to)).second) return false;
+			|| !charMap.emplace(static_cast<char32_t>(from), static_cast<char32_t>(to)).second) return false;
 	}
 	FontLayerList layers;
 	std::vector<std::string> imagePaths;
@@ -1333,7 +1391,7 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 				const int offset = reader.Int();
 				if (!reader.valid || next > 255 || kernSeen[next]) return false;
 				kernSeen[next] = true;
-				glyph.mKerningPairs.emplace_back(static_cast<SexyChar>(next), offset);
+				glyph.mKerningPairs.emplace_back(static_cast<char32_t>(next), offset);
 			}
 		}
 	}
@@ -1656,10 +1714,11 @@ void ImageFont::GenerateActiveFontLayers()
 int ImageFont::StringWidth(const SexyString& theString)
 {
 	int aWidth = 0;
-	SexyChar aPrevChar = 0;
-	for (int i = 0; i < (int)theString.length(); i++)
+	char32_t aPrevChar = 0;
+	size_t anOffset = 0;
+	char32_t aChar = 0;
+	while (UTF8DecodeNext(theString, anOffset, aChar))
 	{
-		SexyChar aChar = theString[i];
 		aWidth += CharWidthKern(aChar, aPrevChar);
 		aPrevChar = aChar;
 	}
@@ -1667,7 +1726,7 @@ int ImageFont::StringWidth(const SexyString& theString)
 	return aWidth;
 }
 
-int ImageFont::CharWidthKern(SexyChar theChar, SexyChar thePrevChar)
+int ImageFont::CharWidthKern(char32_t theChar, char32_t thePrevChar)
 {
 	Prepare();
 
@@ -1733,7 +1792,7 @@ int ImageFont::CharWidthKern(SexyChar theChar, SexyChar thePrevChar)
 	return aMaxXPos;
 }
 
-int ImageFont::CharWidth(SexyChar theChar)
+int ImageFont::CharWidth(char32_t theChar)
 {
 	return CharWidthKern(theChar, 0);
 }
@@ -1780,13 +1839,21 @@ void ImageFont::DrawStringEx(Graphics* g, int theX, int theY, const SexyString& 
 	int aCurXPos = theX;
 	int aCurPoolIdx = 0;
 
-	for (unsigned int aCharNum = 0; aCharNum < theString.length(); aCharNum++)
+	std::vector<char32_t> aCodepoints;
 	{
-		SexyChar aChar = GetMappedChar(theString[aCharNum]);//mFontData->mCharMap[(uchar) theString[aCharNum]];
+		size_t aDecodeOffset = 0;
+		char32_t aDecoded = 0;
+		while (UTF8DecodeNext(theString, aDecodeOffset, aDecoded))
+			aCodepoints.push_back(aDecoded);
+	}
 
-		SexyChar aNextChar = 0;
-		if (aCharNum < theString.length() - 1)
-			aNextChar = GetMappedChar(theString[aCharNum + 1]);//mFontData->mCharMap[(uchar) theString[aCharNum+1]];
+	for (size_t aCharNum = 0; aCharNum < aCodepoints.size(); aCharNum++)
+	{
+		char32_t aChar = GetMappedChar(aCodepoints[aCharNum]);
+
+		char32_t aNextChar = 0;
+		if (aCharNum + 1 < aCodepoints.size())
+			aNextChar = GetMappedChar(aCodepoints[aCharNum + 1]);
 
 		int aMaxXPos = aCurXPos;
 
@@ -2056,7 +2123,7 @@ void ImageFont::Prepare()
 	}
 }
 
-SexyChar ImageFont::GetMappedChar(SexyChar theChar)
+char32_t ImageFont::GetMappedChar(char32_t theChar)
 {
 	auto anItr = mFontData->mCharMap.find(theChar);
 	if (anItr != mFontData->mCharMap.end())

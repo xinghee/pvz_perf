@@ -166,6 +166,10 @@ const char*			GetLogFilePathC(const char* theFileName);
 std::string			GetPathFrom(const std::string& theRelPath, const std::string& theDir);
 bool				AllowAllAccess(const std::string& theFileName);
 std::wstring		UTF8StringToWString(const std::string& theString);
+// UI text is UTF-8 while glyph tables are keyed by code point. These helpers walk
+// one character at a time and report how many bytes it occupied, so callers can
+// advance byte offsets (used for substring slices) without splitting a character.
+char32_t		UTF8DecodeAt(const std::string& theString, size_t theOffset, size_t& outByteLength);
 
 // Read memory and then move the pointer
 // Write memory and then move the pointer
