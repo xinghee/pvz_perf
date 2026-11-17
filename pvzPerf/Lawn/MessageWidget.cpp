@@ -14,33 +14,71 @@
 #include "Sexy.TodLib/TodStringFile.h"
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 namespace
 {
+// mLabel is a fixed 128-byte buffer and the text is UTF-8, so a Chinese message
+// can be short in characters yet overflow in bytes. Truncate on a character
+// boundary instead of letting a byte-count assertion kill the process.
+size_t Utf8CharCount(const char* theText)
+{
+	size_t aCount = 0;
+	size_t anOffset = 0;
+	const SexyString aString(theText ? theText : "");
+	while (anOffset < aString.size())
+	{
+		size_t aBytes = 1;
+		Sexy::UTF8DecodeAt(aString, anOffset, aBytes);
+		anOffset += aBytes;
+		++aCount;
+	}
+	return aCount;
+}
+
+size_t CopyUtf8Prefix(char* theDestination, size_t theCapacity, const SexyString& theText)
+{
+	if (theCapacity == 0)
+		return 0;
+
+	size_t anOffset = 0;
+	size_t aSafe = 0;
+	while (anOffset < theText.size())
+	{
+		size_t aBytes = 1;
+		Sexy::UTF8DecodeAt(theText, anOffset, aBytes);
+		if (anOffset + aBytes > theCapacity - 1)
+			break;
+		anOffset += aBytes;
+		aSafe = anOffset;
+	}
+
+	std::memcpy(theDestination, theText.c_str(), aSafe);
+	theDestination[aSafe] = '\0';
+	return aSafe;
+}
+
 void CopyMessageLabel(SexyChar (&theDestination)[MAX_MESSAGE_LENGTH], const SexyString& theLabel)
 {
+	const size_t aCopied = CopyUtf8Prefix(theDestination, MAX_MESSAGE_LENGTH, theLabel);
+
 	size_t aLineCount = 1;
-	for (SexyChar aChar : theLabel)
+	for (size_t i = 0; i < aCopied; i++)
 	{
-		if (aChar == ('\n'))
+		if (theDestination[i] == ('\n'))
 			++aLineCount;
 	}
 
-	if (theLabel.size() >= MAX_MESSAGE_LENGTH || aLineCount > MAX_REANIM_LINES)
+	if (aLineCount > MAX_REANIM_LINES)
 	{
 		TodAssertFailed(
-			"message label fits its fixed storage",
+			"message label fits its line limit",
 			__FILE__,
 			__LINE__,
-			"translated message has %zu bytes and %zu lines (limits: %d bytes, %d lines)",
-			theLabel.size(),
+			"translated message has %zu lines (limit: %d)",
 			aLineCount,
-			MAX_MESSAGE_LENGTH - 1,
 			MAX_REANIM_LINES);
-		std::abort();
 	}
-
-	std::memcpy(theDestination, theLabel.c_str(), theLabel.size() + 1);
 }
 }
 
@@ -227,7 +265,10 @@ void MessageWidget::LayoutReanimText()
 	int aCurLine = 0, aCurPos = 0;
 	_Font* aFont = GetFont();
 	int aLabelLen = sexystrlen(mLabel);
-	mSlideDurationNs = 1'000'000'000LL + std::int64_t(aLabelLen) * 10'000'000LL;
+	const SexyString aLabelText(mLabel);
+	// 逐字节的 UTF-8 字符串里一个汉字占 3 个字节，打字机时长按字节算会慢 3 倍。
+	const int aCharCount = static_cast<int>(Utf8CharCount(mLabel));
+	mSlideDurationNs = 1'000'000'000LL + std::int64_t(aCharCount) * 10'000'000LL;
 
 	float aLineWidth[MAX_REANIM_LINES];
 	for (int aPos = 0; aPos <= aLabelLen; aPos++)
@@ -251,18 +292,34 @@ void MessageWidget::LayoutReanimText()
 	float aCurPosY = 0.0f;
 	float aCurPosX = -aLineWidth[0] * 0.5f;
 	// 以下遍历字幕中的所有文本，分别在适当的位置创建每一个文字的动画
-	for (int aPos = 0; aPos < aLabelLen; aPos++)
+	// One reanimation per character, not per byte: UTF-8 CJK characters are three
+	// bytes and would otherwise be animated and spaced three times.
+	std::vector<size_t> aCharStarts;
 	{
+		size_t anOffset = 0;
+		while (anOffset < aLabelText.size())
+		{
+			aCharStarts.push_back(anOffset);
+			size_t aBytes = 1;
+			Sexy::UTF8DecodeAt(aLabelText, anOffset, aBytes);
+			anOffset += aBytes;
+		}
+	}
+	for (size_t aCharIndex = 0; aCharIndex < aCharStarts.size(); aCharIndex++)
+	{
+		const size_t aPos = aCharStarts[aCharIndex];
+		size_t aCharBytes = 1;
+		const char32_t aChar = Sexy::UTF8DecodeAt(aLabelText, aPos, aCharBytes);
 		// The advice owner supplies Board time; paused Visual time must not
 		// advance letters while the message deadline remains frozen.
 		// 创建文字的动画
 		Reanimation* aReanimText = mApp->AddReanimation(aCurPosX, aCurPosY, 0, mReanimType, static_cast<std::int64_t>(mApp->mBoard->mLevelTimeNs), ReanimTimeDomain::Battle);
 		aReanimText->mIsAttachment = true;
 		aReanimText->PlayReanim(ReanimTrackId::anim_enter, ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0.0f, 0.0f);
-		mTextReanimID[aPos] = mApp->ReanimationGetID(aReanimText);
+		mTextReanimID[aCharIndex] = mApp->ReanimationGetID(aReanimText);
 
-		aCurPosX += aFont->CharWidth(mLabel[aPos]);  // 坐标调整至下一个文字的位置
-		if (mLabel[aPos] == ('\n'))  // 换行处理
+		aCurPosX += aFont->CharWidth(aChar);  // 坐标调整至下一个文字的位置
+		if (aChar == ('\n'))  // 换行处理
 		{
 			aCurLine++;
 			TOD_ASSERT(aCurLine < MAX_REANIM_LINES);
@@ -297,7 +354,8 @@ void MessageWidget::Update(std::int64_t nowNs)
 		std::max<std::int64_t>(0, mEndTimeNs - nowNs);
 	const auto previousRemainingNs = mEndTimeNs == INT64_MAX ? remainingNs :
 		std::max<std::int64_t>(0, mEndTimeNs - nowNs + static_cast<std::int64_t>(Sexy::gUpdateIntervalNs));
-	int aLabelLen = sexystrlen(mLabel);
+	// 动画是按字符建的，按字节遍历会在一半位置就取不到动画。
+	const int aLabelLen = static_cast<int>(Utf8CharCount(mLabel));
 	// 以下遍历每个文字的动画，设置其动画速率并更新其动画
 	for (int aPos = 0; aPos < aLabelLen; aPos++)
 	{
@@ -348,7 +406,8 @@ void MessageWidget::DrawReanimatedText(Graphics* g, _Font* theFont, const Color&
 		: 0.0f;
 	const auto remainingNs = mEndTimeNs == INT64_MAX ? 100'000'000'000 :
 		std::max<std::int64_t>(0, mEndTimeNs - static_cast<std::int64_t>(mApp->mBoard->mLevelTimeNs));
-	int aLabelLen = sexystrlen(mLabel);
+	// 动画按字符建立，这里也必须按字符数遍历。
+	const int aLabelLen = static_cast<int>(Utf8CharCount(mLabel));
 	for (int aPos = 0; aPos < aLabelLen; aPos++)
 	{
 		Reanimation* aTextReanim = mApp->ReanimationTryToGet(mTextReanimID[aPos]);

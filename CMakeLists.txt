@@ -307,6 +307,10 @@ set(universal_cxxflags "${CMAKE_CXX_FLAGS} ${universal_compiler_flags}")
 set(universal_cflags   "${CMAKE_C_FLAGS} ${universal_compiler_flags}")
 
 if(MSVC)
+    # Generated UI strings are UTF-8 (the resource baker emits the translation
+    # verbatim). Without this MSVC reads the literals in the system code page and
+    # mangles every non-ASCII character.
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/utf-8>)
     set(warn_flags "")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR APPLE)
     set(warn_flags "-Wall -Wextra -Wno-unknown-pragmas")

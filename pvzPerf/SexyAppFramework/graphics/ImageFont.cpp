@@ -15,9 +15,9 @@
 #include <cmath>
 #include <memory>
 #include <utility>
+#include <vector>
 
-using namespace Sexy
-{
+using namespace Sexy;
 
 // Glyph tables are keyed by Unicode code point while UI text stays UTF-8, so
 // measuring and drawing have to walk code points rather than bytes; otherwise a
@@ -73,8 +73,6 @@ bool UTF8DecodeNext(const std::string& theString, size_t& theOffset, char32_t& o
 	theOffset += aExtra + 1;
 	return true;
 }
-}
-;
 
 #if defined(SEXY_FONT_TEXT_COMPAT_TEST_ONLY)
 namespace {

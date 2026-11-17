@@ -34,23 +34,40 @@ void ToolTipWidget::GetLines(std::vector<SexyString>& theLines)
 	// Finish only after emitting the pending line, not merely scanning it.
 	while (aIndexStart != mLabel.size())
 	{
-		while (aIndexInLine < mLabel.size() && mLabel[aIndexInLine] != ' ' && mLabel[aIndexInLine] != '\n')
+		// Chinese has no spaces to break at, so remember where the current run
+		// first overflows the allowed width and cut there as a fallback.
+		const unsigned int aNoBreak = static_cast<unsigned int>(mLabel.size());
+		unsigned int aForcedBreak = aNoBreak;
+
+		while (aIndexInLine < mLabel.size())
 		{
-			aLineWidth += FONT_PICO129->CharWidth(mLabel[aIndexInLine]);
-			aIndexInLine++;
+			size_t aCharBytes = 1;
+			const char32_t aChar = UTF8DecodeAt(mLabel, aIndexInLine, aCharBytes);
+			if (aChar == ' ' || aChar == '\n')
+				break;
+			aLineWidth += FONT_PICO129->CharWidth(aChar);
+			aIndexInLine += static_cast<unsigned int>(aCharBytes);
+			if (aForcedBreak == aNoBreak && aLineWidth >= mGetsLinesWidth)
+				aForcedBreak = aIndexInLine;
 		}
 
 		if (aIndexInLine != mLabel.size() && aLineWidth < mGetsLinesWidth && mLabel[aIndexInLine] != '\n')
 		{
-			aLineWidth += FONT_PICO129->CharWidth(mLabel[aIndexInLine]);
-			aIndexInLine++;
+			size_t aSpaceBytes = 1;
+			aLineWidth += FONT_PICO129->CharWidth(UTF8DecodeAt(mLabel, aIndexInLine, aSpaceBytes));
+			aIndexInLine += static_cast<unsigned int>(aSpaceBytes);
 		}
 		else
 		{
-			SexyString aLine = mLabel.substr(aIndexStart, aIndexInLine - aIndexStart);
+			unsigned int aLineEnd = aIndexInLine;
+			if (aForcedBreak != aNoBreak && aForcedBreak < aLineEnd)
+				aLineEnd = aForcedBreak;
+
+			SexyString aLine = mLabel.substr(aIndexStart, aLineEnd - aIndexStart);
 			aLineWidth = 0;
 			theLines.push_back(std::move(aLine));
 
+			aIndexInLine = aLineEnd;
 			if (aIndexInLine < mLabel.size() && mLabel[aIndexInLine] == '\n')
 			{
 				aIndexInLine++;

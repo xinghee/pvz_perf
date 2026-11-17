@@ -214,13 +214,14 @@ int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rec
 	size_t aLineFeedPos = 0;
 	size_t aCurPos = 0;
 	int aCurWidth = 0;
-	SexyChar aCurChar = '\0';
-	SexyChar aPrevChar = '\0';
+	char32_t aCurChar = 0;
+	char32_t aPrevChar = 0;
 	int aSpacePos = -1;
 	int aMaxWidth = 0;
 	while (aCurPos < theText.size())
 	{
-		aCurChar = theText[aCurPos];
+		size_t aCharBytes = 1;
+		aCurChar = Sexy::UTF8DecodeAt(theText, aCurPos, aCharBytes);
 		StringFormatId aFormatId = StringFormatId::None;
 		const bool aNumericControl = TryReadUiTextControl(theText, aCurPos, aFormatId);
 		if (aNumericControl || aCurChar == '{')
@@ -248,7 +249,7 @@ int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rec
 		{
 			aSpacePos = aCurPos;
 			aCurWidth = theRect.mWidth + 1;
-			aCurPos++;
+			aCurPos += aCharBytes;
 		}
 
 		aCurWidth += (*aCurrentFormat.mNewFont)->CharWidthKern(aCurChar, aPrevChar);  // 当前宽度加上当前字符的宽度
@@ -283,12 +284,12 @@ int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rec
 				aCurPos = aSpacePos + 1;  // 将 aCurPos 移至下一行的开始处
 				if (aCurChar != '\n')
 					while (aCurPos < theText.size() && CharIsSpaceInFormat(theText[aCurPos], aCurrentFormat))
-						aCurPos++;  // aCurPos 跳过所有连续的空白字符
+						aCurPos += aCharBytes;  // aCurPos 跳过所有连续的空白字符
 			}
 			else
 			{
 				if (aCurPos < aLineFeedPos + 1)
-					aCurPos++;  // 确保每行至少有 1 个字符
+					aCurPos += aCharBytes;  // 确保每行至少有 1 个字符
 
 				aLineWidth = TodWriteWordWrappedHelper(
 					g,
@@ -317,7 +318,7 @@ int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rec
 		}
 		else  // 当前宽度未超过限制区域宽度时
 		{
-			aCurPos++;  // 继续下一个字符
+			aCurPos += aCharBytes;  // 继续下一个字符
 		}
 	}
 

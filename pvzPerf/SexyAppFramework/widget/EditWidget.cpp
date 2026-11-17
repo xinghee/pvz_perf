@@ -334,13 +334,18 @@ void EditWidget::ProcessKey(KeyCode theKey, SexyChar theChar)
 		{	
 			SexyString aString;
 
-			for (unsigned int i = 0; i < aBaseString.length(); i++)
+			for (unsigned int i = 0; i < aBaseString.length(); )
 			{
-				if ((aBaseString[i] == '\r') || (aBaseString[i] == '\n'))
+				size_t aCharBytes = 1;
+				const char32_t aChar = UTF8DecodeAt(aBaseString, i, aCharBytes);
+				if (aChar == '\r' || aChar == '\n')
 					break;
 
-				if (mFont->CharWidth(aBaseString[i]) != 0)
-					aString += aBaseString[i];
+				// Keep multi-byte characters even though a bitmap font may have no
+				// glyph metric for them; the old byte test dropped them silently.
+				if (aChar >= 0x80 || mFont->CharWidth(aChar) != 0)
+					aString.append(aBaseString, i, aCharBytes);
+				i += static_cast<unsigned int>(aCharBytes);
 			}			
 
 			if (mHilitePos == -1)
