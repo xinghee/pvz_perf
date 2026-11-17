@@ -54,11 +54,34 @@ jobs:
             echo "no zip inside the artifact" >&2
             exit 1
           fi
-          gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
-            -f tag_name="$tag" \
-            -f name="pvz_perf $tag" \
-            -f target_commitish="$GITHUB_SHA" \
-            -f body="Automated build artifact. Extract over an existing install; keep your bass.dll, effects/ and data/." \
-            >/dev/null 2>&1 || echo "release $tag already exists"
-          gh release upload "$tag" "$zip" --clobber
+          name="$(basename "$zip")"
+
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth="Authorization: Bearer ${GH_TOKEN}"
+
+          rel=$(curl -s -H "$auth" -H "Accept: application/vnd.github+json" "${api}/releases/tags/${tag}" || true)
+          rid=$(printf '%s' "$rel" | python3 -c "import json,sys;print(json.load(sys.stdin).get('id',''))" 2>/dev/null || true)
+
+          if [ -z "$rid" ]; then
+            rid=$(curl -s -X POST -H "$auth" -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" "${api}/releases" \
+              -d "{\"tag_name\":\"${tag}\",\"name\":\"pvz_perf ${tag}\",\"target_commitish\":\"${GITHUB_SHA}\",\"body\":\"Automated build artifact. Extract over an existing install; keep your bass.dll, effects/ and data/.\"}" \
+              | python3 -c "import json,sys;print(json.load(sys.stdin)['id'])")
+            echo "created release ${tag} (${rid})"
+          else
+            echo "reusing release ${tag} (${rid})"
+          fi
+
+          existing=$(curl -s -H "$auth" -H "Accept: application/vnd.github+json" "${api}/releases/${rid}/assets" \
+            | python3 -c "import json,sys;n=sys.argv[1];print(next((a['id'] for a in json.load(sys.stdin) if a['name']==n),''))" "$name")
+          if [ -n "$existing" ]; then
+            curl -s -X DELETE -H "$auth" -H "Accept: application/vnd.github+json" "${api}/releases/assets/${existing}"
+            echo "removed previous asset ${existing}"
+          fi
+
+          curl -s -X POST -H "$auth" -H "Content-Type: application/zip" \
+            --data-binary "@${zip}" \
+            "https://uploads.github.com/repos/${GITHUB_REPOSITORY}/releases/${rid}/assets?name=${name}" \
+            | python3 -c "import json,sys;d=json.load(sys.stdin);print('uploaded', d.get('name'), d.get('size'), d.get('browser_download_url'))"
+
           echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${tag}"
