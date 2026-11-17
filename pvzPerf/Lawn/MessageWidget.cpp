@@ -388,7 +388,7 @@ void MessageWidget::Update(std::int64_t nowNs)
 			}
 			aTextReanim->ApplyRate(TodAnimateCurveNs(0, 500'000'000,
 				(mSlideDurationNs - remainingNs) * aTextSpeed -
-					std::int64_t(aCharIndex) * 10'000'000, 0.0f, 40.0f, Curves::Linear));
+					std::int64_t(aPos) * 10'000'000, 0.0f, 40.0f, Curves::Linear));
 		}
 
 		aTextReanim->UpdateAt(nowNs, Sexy::gUpdateIntervalNs);  //更新动画
