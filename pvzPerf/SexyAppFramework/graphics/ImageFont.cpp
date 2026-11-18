@@ -1475,19 +1475,34 @@ void FontData::ApplyCjkGlyphs()
 		aChar = static_cast<char>(std::tolower(static_cast<unsigned char>(aChar)));
 
 	const CjkFontTable* aTable = FindCjkFontTable(aStem.c_str());
-	if (aTable == nullptr)
+	if (aTable == nullptr || aTable->mSheetPath == nullptr)
 		return;
 
-	// Only the Main layer carries the baked glyphs; outline layers keep their
-	// Latin range and simply draw nothing for a character they do not own.
-	FontLayer* aLayer = &mFontLayerList.front();
-	if (aLayer->mImage == nullptr)
-		return;
-	const int aImageWidth = aLayer->mImage->mWidth;
-	const int aImageHeight = aLayer->mImage->mHeight;
-	if (aImageWidth <= 0 || aImageHeight <= 0)
+	// The Latin atlas keeps its authored size, so the CJK glyphs live in their
+	// own sheet. It is authored at 2x: upload the physical pixels, then expose
+	// the logical size, exactly like the high-resolution image path does.
+	SharedImageRef aSheet = theSexyApp->GetPreparedSharedImage(
+		aTable->mSheetPath, 0, nullptr,
+		[&](Image* theImage)
+		{
+			if (theImage == nullptr) return;
+			theImage->CommitBits();
+			theImage->mWidth = aTable->mSheetLogicalWidth;
+			theImage->mHeight = aTable->mSheetLogicalHeight;
+		});
+	if (aSheet == nullptr || aSheet->mWidth <= 0 || aSheet->mHeight <= 0)
 		return;
 
+	// A supplement layer: same metrics, tags and point-size range as the base
+	// layer, but it only owns the CJK code points. ASCII keeps drawing from the
+	// base layer, so mixed text keeps one line height.
+	FontLayer aLayer(mFontLayerList.front());
+	aLayer.mImage = aSheet;
+	aLayer.mCharData.clear();
+	aLayer.mBaseOrder = static_cast<int>(mFontLayerList.size());
+
+	const int aImageWidth = aSheet->mWidth;
+	const int aImageHeight = aSheet->mHeight;
 	for (int i = 0; i < aTable->mCount; i++)
 	{
 		const CjkGlyphRecord& aRecord = aTable->mRecords[i];
@@ -1496,7 +1511,7 @@ void FontData::ApplyCjkGlyphs()
 			|| aRecord.mY + aRecord.mHeight > aImageHeight)
 			continue;
 
-		CharData& aGlyph = aLayer->mCharData[static_cast<char32_t>(aRecord.mCodepoint)];
+		CharData& aGlyph = aLayer.mCharData[static_cast<char32_t>(aRecord.mCodepoint)];
 		aGlyph.mImageRect = {
 			float(aRecord.mX) / aImageWidth, float(aRecord.mY) / aImageHeight,
 			float(aRecord.mX + aRecord.mWidth) / aImageWidth,
@@ -1507,9 +1522,11 @@ void FontData::ApplyCjkGlyphs()
 		aGlyph.mOrder = aRecord.mOrder;
 
 		const int aGlyphHeight = aRecord.mHeight + aRecord.mOffsetY;
-		if (aGlyphHeight > aLayer->mDefaultHeight)
-			aLayer->mDefaultHeight = aGlyphHeight;
+		if (aGlyphHeight > aLayer.mDefaultHeight)
+			aLayer.mDefaultHeight = aGlyphHeight;
 	}
+
+	mFontLayerList.push_back(std::move(aLayer));
 }
 
 ////

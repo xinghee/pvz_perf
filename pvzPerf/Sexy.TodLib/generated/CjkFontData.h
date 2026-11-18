@@ -28,6 +28,11 @@ struct CjkFontTable
 	const char*				mStem;		// compiled font stem, e.g. "briannetod12"
 	const CjkGlyphRecord*	mRecords;
 	int						mCount;
+	// CJK glyphs live in their own 2x sheet so the Latin atlas keeps the
+	// uniform pixel-to-logical ratio the high-resolution loader requires.
+	const char*				mSheetPath;         // e.g. "data/_briannetod12_cjk"
+	int						mSheetLogicalWidth;
+	int						mSheetLogicalHeight;
 };
 
 // Returns nullptr when the font has no baked CJK glyphs.
