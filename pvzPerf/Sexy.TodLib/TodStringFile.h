@@ -35,5 +35,5 @@ extern TodStringListFormat gLawnStringFormats[12];  //0x6A5010
 // 调用点改走 generated/EntityStrings.h 的 Entity* 系列。
 int                 TodWriteString(Graphics* g, const SexyString& theString, int theX, int theY, TodStringListFormat& theCurrentFormat, int theWidth, DrawStringJustification theJustification, bool drawString, int theOffset, int theLength);
 /*inline*/ int      TodWriteWordWrappedHelper(Graphics* g, const SexyString& theString, int theX, int theY, TodStringListFormat& theCurrentFormat, int theWidth, DrawStringJustification theJustification, bool drawString, int theOffset, int theLength, int theMaxChars);
-int                 TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification, bool drawString);
-/*inline*/ void		TodDrawStringWrapped(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification);
+int                 TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification, bool drawString, int theLineSpacing = 0);
+/*inline*/ void		TodDrawStringWrapped(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification, int theLineSpacing = 0);

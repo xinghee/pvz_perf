@@ -198,7 +198,7 @@ int TodWriteWordWrappedHelper(Graphics* g, const SexyString& theString, int theX
 
 //0x519B50
 // GOTY @Patoke: 0x5241C0
-int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification, bool drawString)
+int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification, bool drawString, int theLineSpacing)
 {
 	int theMaxChars = theText.size();
 	TodStringListFormat aCurrentFormat;
@@ -209,7 +209,9 @@ int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rec
 	aCurrentFormat.mFormatFlags = 0U;
 
 	int aYOffset = theFont->mAscent - theFont->mAscentPadding;
-	int aLineSpacing = theFont->GetLineSpacing() + aCurrentFormat.mLineSpacingOffset;
+	// 中文没有西文那样的上下伸部，按字体的行框（约 1.9 倍字号）排会显得空，
+	// 调用方可以传一个更紧的行距；0 表示沿用字体默认值。
+	int aLineSpacing = theLineSpacing > 0 ? theLineSpacing : theFont->GetLineSpacing() + aCurrentFormat.mLineSpacingOffset;
 	SexyString aCurString;
 	size_t aLineFeedPos = 0;
 	size_t aCurPos = 0;
@@ -348,7 +350,7 @@ int TodDrawStringWrappedHelper(Graphics* g, const SexyString& theText, const Rec
 
 //0x51A040
 // GOTY @Patoke: 0x5246A0
-void TodDrawStringWrapped(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification)
+void TodDrawStringWrapped(Graphics* g, const SexyString& theText, const Rect& theRect, _Font* theFont, const Color& theColor, DrawStringJustification theJustification, int theLineSpacing)
 {
 	const SexyString& aTextFinal = theText;
 	Rect aRectTodUse = theRect;
@@ -356,7 +358,7 @@ void TodDrawStringWrapped(Graphics* g, const SexyString& theText, const Rect& th
 		theJustification == DrawStringJustification::DS_ALIGN_RIGHT_VERTICAL_MIDDLE ||
 		theJustification == DrawStringJustification::DS_ALIGN_CENTER_VERTICAL_MIDDLE)  // 如果纵向需要居中
 	{
-		aRectTodUse.mY += (aRectTodUse.mHeight - TodDrawStringWrappedHelper(g, aTextFinal, aRectTodUse, theFont, theColor, theJustification, false)) / 2;
+		aRectTodUse.mY += (aRectTodUse.mHeight - TodDrawStringWrappedHelper(g, aTextFinal, aRectTodUse, theFont, theColor, theJustification, false, theLineSpacing)) / 2;
 	}
-	TodDrawStringWrappedHelper(g, aTextFinal, aRectTodUse, theFont, theColor, theJustification, true);
+	TodDrawStringWrappedHelper(g, aTextFinal, aRectTodUse, theFont, theColor, theJustification, true, theLineSpacing);
 }
