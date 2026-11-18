@@ -1322,7 +1322,9 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 	if (p_fread(bytes.data(), 1, size, file.get()) != size_t(size)) return false;
 	if (p_fclose(file.release()) != 0) return false;
 	CompiledFontReader reader{bytes};
-	if (reader.UInt() != kCompiledFontMagic || reader.UInt() != kCompiledFontVersion) return false;
+	if (reader.UInt() != kCompiledFontMagic) return false;
+	const unsigned version = reader.UInt();
+	if (version != kCompiledFontVersion && version != 2) return false;
 	const unsigned payloadSize = reader.UInt();
 	const unsigned crc = reader.UInt();
 	const int pointSize = reader.Int();
@@ -1343,6 +1345,7 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 	std::vector<std::string> imagePaths;
 	std::vector<std::vector<Rect>> glyphPixelRectangles;
 	std::vector<std::vector<char32_t>> glyphKeys;
+	std::vector<std::array<unsigned, 2>> logicalImageExtents;
 	std::vector<unsigned> layerIds;
 	for (unsigned i = 0; i < layerCount; ++i)
 	{
@@ -1355,6 +1358,11 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 			|| std::find(layerIds.begin(), layerIds.end(), layer.mLayerId) != layerIds.end()) return false;
 		layerIds.push_back(layer.mLayerId);
 		imagePaths.push_back(reader.Path());
+		const unsigned logicalWidth = version >= 2 ? reader.UInt() : 0;
+		const unsigned logicalHeight = version >= 2 ? reader.UInt() : 0;
+		if ((logicalWidth == 0) != (logicalHeight == 0)
+			|| logicalWidth > 4096 || logicalHeight > 4096) return false;
+		logicalImageExtents.push_back({logicalWidth, logicalHeight});
 		if (imagePaths.back().empty() || !reader.Tags(layer.mRequiredTags, tagCount)
 			|| !reader.Tags(layer.mExcludedTags, tagCount)) return false;
 		layer.mDrawMode = reader.Int();
@@ -1405,7 +1413,23 @@ bool FontData::Load(SexyAppBase* theSexyApp, const std::string& theFontDescFileN
 	for (auto& layer : layers)
 	{
 		const auto& imagePath = imagePaths[index];
-		layer.mImage = theSexyApp->GetPreparedSharedImage(imagePath, 0, nullptr, {});
+		const auto extent = logicalImageExtents[index];
+		bool validExtent = true;
+		layer.mImage = theSexyApp->GetPreparedSharedImage(imagePath, 0, nullptr, [&](Image* image) {
+			if (!extent[0]) return;
+			const auto w = unsigned(image->mWidth), h = unsigned(image->mHeight);
+			validExtent = w >= extent[0] && h >= extent[1]
+				&& w % extent[0] == 0 && h % extent[1] == 0
+				&& w / extent[0] == h / extent[1];
+			if (!validExtent) return;
+			// Upload the physical pixels once, then expose the original logical
+			// dimensions. Glyph drawing keeps its existing UV and metric path.
+			image->CommitBits();
+			image->mWidth = int(extent[0]);
+			image->mHeight = int(extent[1]);
+		});
+		if (!validExtent || (extent[0] && static_cast<Image*>(layer.mImage)
+			&& (layer.mImage->mWidth != int(extent[0]) || layer.mImage->mHeight != int(extent[1])))) return false;
 		if (static_cast<Image*>(layer.mImage) == nullptr ||
 			layer.mImage->mWidth<=0 || layer.mImage->mHeight<=0) return false;
 		for (size_t gi=0;gi<glyphKeys[index].size();++gi)

@@ -11,6 +11,7 @@
 
 namespace Sexy {
 using namespace GL3;
+namespace { constexpr int ScenePixelScale=2; }
 
 GLTexture::~GLTexture()
 {
@@ -26,7 +27,7 @@ void GLRenderer::Impl::AllocateStorage(GLTexture& texture, int w, int h, unsigne
 {
     Dimensions(w, h);
     auto* result = &texture;
-    result->width = w; result->height = h; result->format = format;
+    result->width = result->drawingWidth = w; result->height = result->drawingHeight = h; result->format = format;
     glGenTextures(1, &result->image);
     glBindTexture(GL_TEXTURE_2D, result->image);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -234,7 +235,7 @@ void GLRenderer::Impl::Flush()
             const unsigned int programBit=batch.mixed?4U:batch.sprite?1U:2U;
             if(!(configuredPrograms&programBit)) {
                 const auto& uniforms=batch.mixed?mixedSpriteUniforms:batch.sprite?spriteUniforms:sceneUniforms;
-                glUniform2f(uniforms[uTargetExtent],float(target->width),float(target->height));
+                glUniform2f(uniforms[uTargetExtent],float(selected?target->drawingWidth:width),float(selected?target->drawingHeight:height));
                 glUniform1i(uniforms[uImage],0);
                 if(!batch.sprite)glUniform1i(uniforms[uPremultipliedOutput],target->render);
                 configuredPrograms|=programBit;
@@ -254,7 +255,8 @@ void GLRenderer::Impl::Flush()
         }
         if(!previousBatch||batch.clip.x!=previousBatch->clip.x||batch.clip.y!=previousBatch->clip.y||
             batch.clip.width!=previousBatch->clip.width||batch.clip.height!=previousBatch->clip.height)
-            glScissor(batch.clip.x,batch.clip.y,batch.clip.width,batch.clip.height);
+            glScissor(batch.clip.x*(selected?selected->pixelScale:ScenePixelScale),batch.clip.y*(selected?selected->pixelScale:ScenePixelScale),
+                batch.clip.width*(selected?selected->pixelScale:ScenePixelScale),batch.clip.height*(selected?selected->pixelScale:ScenePixelScale));
         if(!previousBatch||batch.blend!=previousBatch->blend||batch.mixed!=previousBatch->mixed){
             if (batch.blend == GpuBlend::Opaque) glDisable(GL_BLEND);
             else {
@@ -330,10 +332,12 @@ void GLRenderer::Impl::Submit(std::span<const GpuVertex> input, GLTexture* sourc
     if (!open || input.size() % primitiveSize)
         throw std::logic_error("OpenGL submission requires an open scene and complete primitive list");
     auto* target = selected ? selected : scene;
-    const GpuClip bounds{0, 0, target->width, target->height};
+    const int logicalWidth=selected?target->drawingWidth:width;
+    const int logicalHeight=selected?target->drawingHeight:height;
+    const GpuClip bounds{0, 0, logicalWidth, logicalHeight};
     GpuClip clip = requested ? *requested : bounds;
-    const int right = std::min(target->width, clip.x + std::max(0, clip.width));
-    const int top = std::min(target->height, clip.y + std::max(0, clip.height));
+    const int right = std::min(logicalWidth, clip.x + std::max(0, clip.width));
+    const int top = std::min(logicalHeight, clip.y + std::max(0, clip.height));
     clip.x = std::max(0, clip.x); clip.y = std::max(0, clip.y);
     clip.width = std::max(0, right - clip.x); clip.height = std::max(0, top - clip.y);
     if (!clip.width || !clip.height) return;
@@ -410,7 +414,7 @@ GLRenderer::GLRenderer(GLContext& context, int w, int h,
     impl_->white = CreateTexture(1, 1, &white, 4);
     impl_->slots[impl_->white->slot] = nullptr;
     impl_->white->slot = 0; impl_->slots[0] = impl_->white;
-    impl_->scene = impl_->Allocate(w, h, GL_RGBA8, false);
+    impl_->scene = impl_->Allocate(w*ScenePixelScale, h*ScenePixelScale, GL_RGBA8, false);
     impl_->BindTarget(); glDisable(GL_SCISSOR_TEST);
     glClearColor(0, 0, 0, 1); glClear(GL_COLOR_BUFFER_BIT);
 }
@@ -441,7 +445,7 @@ void GLRenderer::PrepareLoadingPipelines()
     cache(s.fontProgram,s.fontUniforms);cache(s.presentProgram,s.presentUniforms);
     s.poolProgram = s.Program(PoolVertexShader(), SceneFragmentShader());
     static constexpr std::array poolNames{"targetExtent","image","premultipliedOutput","coverageInput",
-        "poolSize","poolTranslation","waveTime","poolLayer","poolNight","poolSlot","poolSampler"};
+        "poolSize","poolTranslation","waveTime","poolClip","poolLayer","poolNight","poolSlot","poolSampler"};
     for (size_t i=0;i<poolNames.size();++i)
         s.poolUniforms[i]=glGetUniformLocation(s.poolProgram,poolNames[i]);
     glGenVertexArrays(1,&s.poolVao); glBindVertexArray(s.poolVao);
@@ -535,10 +539,14 @@ GLTexture* GLRenderer::CreateCoverageMask(int w, int h,
     catch (...) { DestroyTexture(image); throw; }
     return image;
 }
-GLTexture* GLRenderer::CreateRenderImage(int w, int h)
+GLTexture* GLRenderer::CreateRenderImage(int w, int h, int pixelScale)
 {
+    if(pixelScale<1 || pixelScale>2 || w<=0 || h<=0 ||
+        unsigned(w)>MaxImageDimension2D()/pixelScale || unsigned(h)>MaxImageDimension2D()/pixelScale)
+        throw std::invalid_argument("Invalid render image pixel scale or dimensions");
+
     auto& s = *impl_; s.Flush();
-    auto* image = s.Allocate(w, h, GL_RGBA16F, true);
+    auto* image = s.Allocate(w*pixelScale, h*pixelScale, GL_RGBA16F, true);
     image->render = true; image->flags = 0x80000000U;
     auto* previous = s.selected; s.selected = image;
     try {
@@ -547,6 +555,7 @@ GLTexture* GLRenderer::CreateRenderImage(int w, int h)
         s.Check("Clear RGBA16F OpenGL render image");
     } catch (...) { s.selected = previous; DestroyTexture(image); throw; }
     s.selected = previous;
+    image->drawingWidth=w; image->drawingHeight=h; image->pixelScale=pixelScale;
     return image;
 }
 void GLRenderer::DestroyTexture(GLTexture* image)
@@ -625,11 +634,6 @@ void GLRenderer::SubmitPool(GLTexture* texture,const GpuPoolParams& params)
         throw std::invalid_argument("Invalid OpenGL pool layer/sampler/blend");
     s.Flush();
     auto* target=s.selected ? s.selected : s.scene;
-    const auto left = std::clamp<long long>(params.clip.x, 0, target->width);
-    const auto top = std::clamp<long long>(params.clip.y, 0, target->height);
-    const auto right = std::clamp<long long>(static_cast<long long>(params.clip.x) + params.clip.width, 0, target->width);
-    const auto bottom = std::clamp<long long>(static_cast<long long>(params.clip.y) + params.clip.height, 0, target->height);
-    if (right <= left || bottom <= top) return;
     GLTexture feedback;
     if (texture==target) {
         s.Snapshot(*texture,feedback);
@@ -637,19 +641,19 @@ void GLRenderer::SubmitPool(GLTexture* texture,const GpuPoolParams& params)
     s.BindTarget();
     glBindVertexArray(s.poolVao); glUseProgram(s.poolProgram);
     const auto& u=s.poolUniforms;
-    glUniform2f(u[0],float(target->width),float(target->height));
+    glUniform2f(u[0],float(s.selected?target->drawingWidth:s.width),float(s.selected?target->drawingHeight:s.height));
     glUniform1i(u[1],0); glUniform1i(u[2],target->render); glUniform1i(u[3],0);
     glUniform2f(u[4],params.width,params.height);
     glUniform2f(u[5],params.transX,params.transY);
     glUniform4f(u[6],params.time1,params.time2,params.time3,params.time5);
-    glUniform1ui(u[7],params.layer); glUniform1ui(u[8],params.night);
-    glUniform1ui(u[9],texture->slot|texture->flags|params.samplingFlags);
-    glUniform1ui(u[10],params.sampler);
+    glUniform4f(u[7],float(params.clip.x),float(params.clip.y),
+        float(double(params.clip.x)+params.clip.width),float(double(params.clip.y)+params.clip.height));
+    glUniform1ui(u[8],params.layer); glUniform1ui(u[9],params.night);
+    glUniform1ui(u[10],texture->slot|texture->flags|params.samplingFlags);
+    glUniform1ui(u[11],params.sampler);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D,feedback.image ? feedback.image : texture->image);
-    glEnable(GL_SCISSOR_TEST);
-    glScissor(static_cast<int>(left), static_cast<int>(top),
-        static_cast<int>(right-left), static_cast<int>(bottom-top));
+    glDisable(GL_SCISSOR_TEST);
     if (params.blend==GpuBlend::Opaque) glDisable(GL_BLEND);
     else {
         glEnable(GL_BLEND);
@@ -729,7 +733,7 @@ void GLRenderer::ResizeScene(int width, int height)
     if (s.open || s.selected)
         throw std::logic_error("Resize the main OpenGL canvas between scenes");
     if (s.width == width && s.height == height) return;
-    auto* next = s.Allocate(width, height, GL_RGBA8, false);
+    auto* next = s.Allocate(width*ScenePixelScale, height*ScenePixelScale, GL_RGBA8, false);
     auto* previous = s.scene;
     s.scene = next;
     s.width = width;

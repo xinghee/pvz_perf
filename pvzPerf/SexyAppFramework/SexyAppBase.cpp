@@ -14,7 +14,6 @@
 #include "misc/DemoFileReader.h"
 #include "misc/DemoReplayDispatch.h"
 #include <array>
-#include "effect/ScaleEffectSizing.h"
 #include "misc/StableTime.h"
 #include "JsonDoc.h"
 #include "graphics/DDInterface.h"
@@ -448,16 +447,6 @@ SexyAppBase::SexyAppBase()
 	mWidescreenAware = false;
 	mEnableWindowAspect = false;
 	mWindowAspect.Set(4, 3);
-	mWindowScale = 2;
-	mUseCustomScale = true;
-	mScaleConfigWindow = 2;
-	mWindowScaleFromPipeline = 1;
-	mScaleConfigFullscreenWidth = 0;
-	mScaleConfigFullscreenHeight = 0;
-	mScaleWindowConfig.mOutputWidth = 0;
-	mScaleWindowConfig.mOutputHeight = 0;
-	mScaleFullscreenConfig.mOutputWidth = 0;
-	mScaleFullscreenConfig.mOutputHeight = 0;
 	mIsWideWindow = false;
 
 	int i;
@@ -540,8 +529,6 @@ SexyAppBase::~SexyAppBase()
 		mLoadingFailed = true;
 	WaitForLoadingThread();
 	Shutdown();
-
-
 
 	DialogMap::iterator aDialogItr = mDialogMap.begin();
 	while (aDialogItr != mDialogMap.end())
@@ -1214,6 +1201,12 @@ std::optional<std::vector<ImageDiagnosticRecord>> SexyAppBase::CaptureImageDiagn
         else
         {
             record.pixels = render.ReadImagePixels(*image);
+            if(!screen)
+            {
+                record.width=record.pixels->width;
+                record.height=record.pixels->height;
+                record.gpuTexels=ImageTexelBytes(record.width,record.height);
+            }
             record.pixelStatus = screen ? "native screen" : "native GPU";
         }
         records.push_back(std::move(record));
@@ -1351,6 +1344,9 @@ void SexyAppBase::WriteToRegistry()
     aDoc.SetBool("unlockAllLevels",mUnlockAllLevels);
 #if defined(__ANDROID__)
     aDoc.SetBool("hdr", false);
+#else
+    aDoc.SetBool("hdr", mHdrRequested);
+    aDoc.SetFloat("hdrStrength", mScaleHDRStrength);
 #endif
     // Persist slider percentages, not mixer gain. The original SFX slider's
     // full-scale gain is 0.65; both JSON fields still range from 0 to 100.
@@ -1358,11 +1354,14 @@ void SexyAppBase::WriteToRegistry()
     aDoc.SetInt("sfxVolume", std::llround(std::clamp(mSfxVolume / 0.65, 0.0, 1.0) * 100.0));
 	aDoc.SetInt("muted", (mMuteCount - mAutoMuteCount > 0) ? 1 : 0);
 	aDoc.SetString("screenMode", mIsWindowed ? "windowed" : "fullscreen");
+#ifdef _WIN32
+    aDoc.SetInt("windowWidth", mWindowClientWidth);
+    aDoc.SetInt("windowHeight", mWindowClientHeight);
+#endif
 	aDoc.SetInt("preferredX", mPreferredX);
 	aDoc.SetInt("preferredY", mPreferredY);
 	aDoc.SetInt("customCursors", mCustomCursorsEnabled ? 1 : 0);
 	aDoc.SetInt("waitForVSync", mWaitForVSync ? 1 : 0);
-	aDoc.SetInt("customScale", mUseCustomScale ? 1 : 0);
 #ifdef _WIN32
 	aDoc.SaveFile(SettingsPath());
 #else
@@ -1750,6 +1749,10 @@ void SexyAppBase::ReadFromRegistry()
 		mMuteCount = (int)aDoc.GetInt("muted", 0);
 	if (aDoc.Has("screenMode"))
 		mIsWindowed = LowerScaleText(aDoc.GetString("screenMode", "")) == "windowed";
+#ifdef _WIN32
+    mWindowClientWidth=int(std::clamp(aDoc.GetInt("windowWidth",0),0LL,5600LL));
+    mWindowClientHeight=int(std::clamp(aDoc.GetInt("windowHeight",0),0LL,2400LL));
+#endif
 	if (aDoc.Has("preferredX"))
 		mPreferredX = (int)aDoc.GetInt("preferredX", 0);
 	if (aDoc.Has("preferredY"))
@@ -1758,8 +1761,6 @@ void SexyAppBase::ReadFromRegistry()
 		EnableCustomCursors(aDoc.GetInt("customCursors", 0) != 0);
 	if (aDoc.Has("waitForVSync"))
 		mWaitForVSync = aDoc.GetInt("waitForVSync", 0) != 0;
-	if (aDoc.Has("customScale"))
-		mUseCustomScale = aDoc.GetInt("customScale", 0) != 0;
 	if (settingsChanged && !aDoc.SaveFile(SettingsPath()))
 		throw std::runtime_error("Cannot normalize frame rate settings: " + SettingsPath());
 }
@@ -2123,7 +2124,6 @@ void SexyAppBase::Shutdown()
 
 		if (mDDInterface && mDDInterface->mRenderInterface)
 			mDDInterface->mRenderInterface->Flush();
-		CleanupScalePresent();
 #ifdef _WIN32
         CloseWindowsHdr(mNativeHdrState);
 #endif
@@ -3061,15 +3061,6 @@ void SexyAppBase::Done3dTesting()
 {
 }
 
-
-
-
-
-
-
-
-
-
 void SexyAppBase::LoadingThreadProc()
 {
 }
@@ -3124,7 +3115,7 @@ void SexyAppBase::StartLoadingThread()
 	}
 }
 
-void SexyAppBase::RequestScreenMode(bool wantWindowed, bool useCustomScale)
+void SexyAppBase::RequestScreenMode(bool wantWindowed)
 {
 	if (mSwitchingScreenMode)
 		return;
@@ -3135,7 +3126,6 @@ void SexyAppBase::RequestScreenMode(bool wantWindowed, bool useCustomScale)
 	else if (mForceFullscreen)
 		anEffectiveWindowed = false;
 
-	const bool aScaleChanged = mUseCustomScale != useCustomScale;
 
 	// Normalize input before either source enters the transaction. This is a
 	// state cancellation, not a synthetic MouseUp: Alt+Enter while dragging must
@@ -3148,25 +3138,6 @@ void SexyAppBase::RequestScreenMode(bool wantWindowed, bool useCustomScale)
 		mWidgetManager->CancelMouseDownState();
 	ClearKeysDown();
 
-    if (aScaleChanged) {
-        if (anEffectiveWindowed==mIsWindowed) {
-            ReconfigureScale(useCustomScale);
-        } else {
-            // Commit both choices in the single mode transaction below. Do not
-            // resize/present an intermediate window for the old mode first.
-            auto& render=*mDDInterface->mRenderInterface;
-            render.Flush();
-            mUseCustomScale=useCustomScale;
-            mWindowScale=mUseCustomScale?GetWindowScaleForCustomScale():1;
-            PrepareScalePipelineObjects();
-            if (mUseCustomScale) {
-                render.mRenderer->WarmScale(false);
-                render.mRenderer->WarmScale(true);
-            }
-        }
-    }
-    // The virtual completion hook still synchronizes the options checkboxes.
-    // ReconfigureScale already completed a scale-only resize; do not do it twice.
     SwitchScreenMode(anEffectiveWindowed,false);
 	if (mShutdown)
 		return;
@@ -3185,132 +3156,9 @@ void SexyAppBase::RequestScreenMode(bool wantWindowed, bool useCustomScale)
 	UpdateCursorClip();
 }
 
-// Sizes the existing HWND for the requested screen mode without destroying
-// it. Windowed uses the logical size times the custom-scale multiplier;
-// fullscreen is a borderless window covering the desktop (matching the
-// runtime behavior of the original: no display-mode change on toggle).
-bool SexyAppBase::ResizeAppWindowForMode(bool wantWindowed)
-{
-#ifdef _WIN32
-	if (mHWnd == NULL)
-		return false;
-
-	// Preserve visibility. GWL_STYLE is replaced wholesale below, and dropping
-	// WS_VISIBLE makes the window disappear (clicks then fall through to the
-	// desktop while DWM keeps compositing the last frame).
-	::SetLastError(ERROR_SUCCESS);
-	const DWORD aCurrentStyle = (DWORD)::GetWindowLongPtr(mHWnd, GWL_STYLE);
-	if (aCurrentStyle == 0 && ::GetLastError() != ERROR_SUCCESS)
-	{
-		return false;
-	}
-	const bool aWasVisible = (aCurrentStyle & WS_VISIBLE) != 0;
-
-	DWORD aWindowStyle;
-	int aWidth;
-	int aHeight;
-	int aPlaceX;
-	int aPlaceY;
-
-	if (wantWindowed)
-	{
-		aWindowStyle = WS_CLIPCHILDREN | WS_POPUP | WS_BORDER | WS_CAPTION |
-			WS_SYSMENU | WS_MINIMIZEBOX;
-		if (mEnableMaximizeButton)
-			aWindowStyle |= WS_MAXIMIZEBOX;
-
-		int aClientW = mWidth * (mWindowScale > 1 ? mWindowScale : 1);
-		int aClientH = mHeight * (mWindowScale > 1 ? mWindowScale : 1);
-
-		RECT aRect;
-		aRect.left = 0;
-		aRect.top = 0;
-		aRect.right = aClientW;
-		aRect.bottom = aClientH;
-		if (!AdjustWindowRect(&aRect, aWindowStyle, FALSE))
-		{
-			return false;
-		}
-		aWidth = aRect.right - aRect.left;
-		aHeight = aRect.bottom - aRect.top;
-
-		RECT aDesktopRect;
-		if (!::SystemParametersInfo(SPI_GETWORKAREA, 0, &aDesktopRect, 0))
-		{
-			return false;
-		}
-
-		aPlaceX = 64;
-		aPlaceY = 64;
-		if (mPreferredX != -1)
-		{
-			aPlaceX = mPreferredX;
-			aPlaceY = mPreferredY;
-
-			int aSpacing = 4;
-			if (aPlaceX < aDesktopRect.left + aSpacing)
-				aPlaceX = aDesktopRect.left + aSpacing;
-			if (aPlaceY < aDesktopRect.top + aSpacing)
-				aPlaceY = aDesktopRect.top + aSpacing;
-			if (aPlaceX + aWidth >= aDesktopRect.right - aSpacing)
-				aPlaceX = aDesktopRect.right - aWidth - aSpacing;
-			if (aPlaceY + aHeight >= aDesktopRect.bottom - aSpacing)
-				aPlaceY = aDesktopRect.bottom - aHeight - aSpacing;
-		}
-		else
-		{
-			aPlaceX = aDesktopRect.left + ((aDesktopRect.right - aDesktopRect.left) - aWidth) / 2;
-			aPlaceY = aDesktopRect.top + (int)(((aDesktopRect.bottom - aDesktopRect.top) - aHeight) * 0.382);
-		}
-	}
-		else
-		{
-			aWindowStyle = WS_POPUP;
-			RECT aMonitorRect;
-			if (!GetFullscreenMonitorRect(mHWnd, aMonitorRect))
-			{
-				return false;
-			}
-			aPlaceX = aMonitorRect.left;
-			aPlaceY = aMonitorRect.top;
-			aWidth = aMonitorRect.right - aMonitorRect.left;
-			aHeight = aMonitorRect.bottom - aMonitorRect.top;
-		}
-
-	if (aWasVisible)
-		aWindowStyle |= WS_VISIBLE;
-
-	::SetLastError(ERROR_SUCCESS);
-	const LONG_PTR aPreviousStyle = ::SetWindowLongPtr(mHWnd, GWL_STYLE, aWindowStyle);
-	if (aPreviousStyle == 0 && ::GetLastError() != ERROR_SUCCESS)
-	{
-		return false;
-	}
-	if (!::SetWindowPos(
-		mHWnd,
-		NULL,
-		aPlaceX,
-		aPlaceY,
-		aWidth,
-		aHeight,
-		SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE |
-		(aWasVisible ? SWP_SHOWWINDOW : 0)))
-	{
-		return false;
-	}
-	return true;
-#else
-	if (!mNativeWindow) return false;
-	SetWindowFullscreen(!wantWindowed);
-	if (wantWindowed)
-		ResizeWindowClient(mWidth * std::max(1, mWindowScale), mHeight * std::max(1, mWindowScale));
-	return true;
-#endif
-}
-
 void SexyAppBase::SwitchScreenMode(bool wantWindowed)
 {
-	RequestScreenMode(wantWindowed, mUseCustomScale);
+	RequestScreenMode(wantWindowed);
 }
 
 void SexyAppBase::SwitchScreenMode()
@@ -3328,8 +3176,6 @@ void SexyAppBase::SetAlphaDisabled(bool isDisabled)
 		mWidgetManager->MarkAllDirty();
 	}
 }
-
-
 
 void SexyAppBase::ProcessSafeDeleteList()
 {
@@ -3936,6 +3782,10 @@ void SexyAppBase::WarmScalePipelinesBeforeShow()
         }
         ResizeWindowClient(width,height);
     }
+void SexyAppBase::InitializeNativePresentation()
+{
+    if(mIsWindowed)ResizeWindowClient(mDDInterface->mRenderInterface->mRenderer->sceneWidth,
+        mDDInterface->mRenderInterface->mRenderer->sceneHeight);
     UpdateWindowGeometry();
 }
 
@@ -4027,20 +3877,6 @@ void SexyAppBase::ShowResourceError(bool doExit)
 	if (doExit)
 		DoExit(1);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 void SexyAppBase::DoParseCmdLine()
 {
@@ -4288,23 +4124,20 @@ void SexyAppBase::Init()
 #endif
 
 	InitPropertiesHook();
-	// Settings (settings.json, incl. customScale) are read before the immutable
+	// Settings (settings.json) are read before the immutable
 	// scale configuration. Both pipelines compile regardless of checkbox state.
 	ReadFromRegistry();
 	gUpdateTicks = static_cast<double>(mFrameTiming.mIntervalNs) / FrameTiming::LegacyTickNs;
 	gStepsPerLegacyTick = 1.0 / gUpdateTicks;
 	gUpdateIntervalNs = mFrameTiming.mIntervalNs;
 	gLegacyTickPhaseNs = 0;
-	LoadScaleConfig();
+	LoadHdrConfig();
 
 	// The two XML pipelines are process-global immutable configuration. Read and
 	// inline-compile them exactly once before any main HWND exists, even when the
 	// direct (Custom Scale off) presentation path is initially selected. Their
 	// Vulkan shader objects are materialized after the device is created and then
 	// remain resident for that device's lifetime.
-	CompileScaleEffects();
-	UpdateWindowScaleFromPipeline();
-	mWindowScale = mUseCustomScale ? GetWindowScaleForCustomScale() : 1;
 
 #ifdef _WIN32
 	if (CheckForVista())
@@ -4382,9 +4215,9 @@ void SexyAppBase::Init()
 
 	// Create a message we can use to talk to ourselves inter-process
 #ifdef _WIN32
-	mNotifyGameMessage = RegisterWindowMessageA("pvz_perf.Notify");
+	mNotifyGameMessage = RegisterWindowMessageA("pvz_perf.HD.Notify");
 
-	std::string instanceName="pvz_perf.SingleInstance";
+	std::string instanceName="pvz_perf.HD.SingleInstance";
 	::SetLastError(ERROR_SUCCESS);
 	mMutex = ::CreateMutexA(NULL, TRUE, instanceName.c_str());
 	const DWORD aMutexError = ::GetLastError();
@@ -4458,7 +4291,7 @@ void SexyAppBase::Init()
 	DetectTargetFrameRate();
 	// Device/window remain hidden while BOTH native chains are materialized and
 	// warmed. This happens even when the checkbox is initially off.
-	WarmScalePipelinesBeforeShow();
+	InitializeNativePresentation();
 		if (mPlayingDemoBuffer)
 	{
 		// Get video data
@@ -4744,9 +4577,6 @@ void SexyAppBase::Remove3DData(Image* theMemoryImage)
 		mDDInterface->Remove3DData(theMemoryImage);
 }
 
-
-
-
 void SexyAppBase::DemoSyncRefreshRate()
 {
 	mSyncRefreshRate = mDDInterface->mRefreshRate;
@@ -4765,37 +4595,7 @@ void SexyAppBase::DemoSyncRefreshRate()
 
 // Keep compiled scale programs available, but allocate/warm their image chains
 // only while custom scaling is enabled. Disabling releases both mode chains.
-void SexyAppBase::ReconfigureScale(bool theUseCustomScale)
-{
-    if (mUseCustomScale==theUseCustomScale) return;
-    if (mSwitchingScreenMode) throw std::logic_error("Nested scale/mode transaction");
-    mSwitchingScreenMode=true;
-    struct Reset { bool& flag; ~Reset(){flag=false;} } reset{mSwitchingScreenMode};
-    ReleaseCursorClip();
-    mWidgetManager->CancelMouseDownState(); ClearKeysDown();
-    auto& render=*mDDInterface->mRenderInterface;
-    render.Flush();
-    mUseCustomScale=theUseCustomScale;
-    mWindowScale=mUseCustomScale?GetWindowScaleForCustomScale():1;
-    PrepareScalePipelineObjects();
-    if (mUseCustomScale) {
-        render.mRenderer->WarmScale(false);
-        render.mRenderer->WarmScale(true);
-    }
-    render.mRenderer->SetScaleMode(IsScalePresentActive(),!mIsWindowed);
-    // Change geometry after enabled pipelines are ready, then present the canvas.
-    if (mIsWindowed) {
-        int width=render.mRenderer->sceneWidth,height=render.mRenderer->sceneHeight;
-        if (IsScalePresentActive()) {
-            const auto image=render.mRenderer->ScaleOutput(false);
-            width=int(image.width);height=int(image.height);
-        }
-        ResizeWindowClient(width,height);
-    }
-    UpdateWindowGeometry();
-    render.PresentRetainedFrame();
-    ClearUpdateBacklog(false);
-}
+
 
 static std::string LowerScaleText(const std::string& theText)
 {
@@ -4805,19 +4605,25 @@ static std::string LowerScaleText(const std::string& theText)
 	return aResult;
 }
 
-[[maybe_unused]] static std::string NormalizeScaleEffectPath(std::string thePath)
+void SexyAppBase::LoadHdrConfig()
 {
-	if (thePath.empty())
-		return thePath;
-	for (char& aChar : thePath)
-		if (aChar == '\\')
-			aChar = '/';
-	if (LowerScaleText(thePath).compare(0, 8, "effects/") == 0)
-		thePath.erase(0, 8);
-	const std::string aLowerPath = LowerScaleText(thePath);
-	if (aLowerPath.size() <= 5 || aLowerPath.compare(aLowerPath.size() - 5, 5, ".hlsl") != 0)
-		thePath += ".hlsl";
-	return thePath;
+#if !defined(__ANDROID__)
+    JsonDoc settings;
+    settings.LoadFile(SettingsPath());
+    mHdrRequested = settings.GetBool("hdr", false);
+    double strength = settings.GetFloat("hdrStrength", 1.0);
+    if (!settings.Has("hdr")) {
+        JsonDoc legacy;
+        if (legacy.LoadFile("scale.json") && legacy.GetType("HDR") == JsonDoc::Type::Object) {
+            mHdrRequested = legacy.GetBool("HDR/enable", true);
+            strength = legacy.GetFloat("HDR/strength", 1.0);
+        }
+    }
+    mScaleHDREnabled = mHdrRequested;
+    if (!std::isfinite(strength) || strength < 0.0 || strength > 1.0)
+        throw std::runtime_error("HDR strength must be a finite number in [0,1]");
+    mScaleHDRStrength = static_cast<float>(strength);
+#endif
 }
 
 [[maybe_unused]] static bool ParseScaleParamValue(const std::string& text, float& out)
@@ -5013,6 +4819,7 @@ void SexyAppBase::LoadScaleConfig()
 // 查询使用独立于渲染 API 的 Windows AdvancedColorInfo；公式保留 legacy），
 // 不暴露、不回写 scale.json；启动读一次，之后接收系统通知而不轮询。strength 是 scale.json
 // 唯一暴露项（AutoHDRStrength 同义，默认 1）。
+// Display brightness anchors come from the active display.
 void SexyAppBase::ResolveHDRAutoParams()
 {
 #if (defined(PVZ_GPU_OPENGL) || defined(PVZ_GPU_WEBGL) || defined(PVZ_GPU_WEBGPU)) || defined(PVZ_GPU_D3D9)
@@ -5025,133 +4832,6 @@ void SexyAppBase::ResolveHDRAutoParams()
 #else
 	if (mScaleHDREnabled) throw std::runtime_error("Linux HDR output is not implemented");
 #endif
-}
-
-void SexyAppBase::CompileScaleEffects()
-{
-    // Source was compiled while resolving startup configuration, before GPU preparation.
-    if(mModernScalePrepared) throw std::logic_error("Scale shaders may only load before device preparation");
-#if (defined(PVZ_GPU_OPENGL) || defined(PVZ_GPU_WEBGL) || defined(PVZ_GPU_WEBGPU)) || defined(PVZ_GPU_D3D9) || (defined(__ANDROID__) && !defined(SEXY_SCALE_EFFECT_AUTHORING))
-    if(!mScaleEffects.empty())
-        throw std::runtime_error("This graphics backend does not support HLSL/compute scale effects");
-#else
-    for(const auto& effect:mScaleEffects) {
-        std::string error;
-#if defined(PVZ_GPU_D3D12)
-        if(!ScaleEffectCompiler::ValidateD3d12(effect,error)) throw std::runtime_error(error);
-#else
-        if(!ScaleEffectBinary::Validate(effect,error)) throw std::runtime_error(error);
-#endif
-    }
-#endif
-}
-
-	bool SexyAppBase::IsScalePresentActive() const
-	{
-		return IsScalePresentActiveForMode(mIsWindowed);
-	}
-
-	bool SexyAppBase::IsScalePresentActiveForMode(bool theWindowed) const
-	{
-		if (!mUseCustomScale)
-			return false;
-		const ScalePipelineConfig& aConfig =
-			theWindowed ? mScaleWindowConfig : mScaleFullscreenConfig;
-		// An empty mode section is an intentional direct-present path. Do not
-		// install a callback merely because the XML container or an output marker
-		// exists: without effects there is no custom shader stage to execute.
-		return aConfig.mDeclared && !aConfig.mEffects.empty();
-	}
-
-
-bool SexyAppBase::BuildScalePipelineForMode(bool theWindowed,
-    std::vector<ScaleEffectRuntimeDesc*>& outEffects, std::vector<ScaleEffectScaling>& outScalings)
-{
-    outEffects.clear(); outScalings.clear();
-    const auto& config=theWindowed?mScaleWindowConfig:mScaleFullscreenConfig;
-    if(!config.mDeclared) return false;
-    for(const auto& entry:config.mEffects) {
-        if(entry.mEffectSlot>=mScaleEffects.size()) return false;
-        outEffects.push_back(&mScaleEffects[entry.mEffectSlot]);
-        outScalings.push_back({entry.mScalingType,entry.mScaleX,entry.mScaleY});
-    }
-    return true;
-}
-
-	bool SexyAppBase::ComputeCustomScaleOutputSize(
-		bool theWindowed, int theSrcW, int theSrcH, int& outW, int& outH)
-	{
-		std::vector<ScaleEffectRuntimeDesc*> aEffects;
-		std::vector<ScaleEffectScaling> aScalings;
-		if (!BuildScalePipelineForMode(theWindowed, aEffects, aScalings))
-			return false;
-
-		int aTgtW = theSrcW;
-		int aTgtH = theSrcH;
-		if (theWindowed)
-		{
-			aTgtW = theSrcW * GetWindowScaleForCustomScale();
-			aTgtH = theSrcH * GetWindowScaleForCustomScale();
-		}
-		else
-		{
-#ifdef _WIN32
-			RECT aMonitorRect;
-			if (!GetFullscreenMonitorRect(mHWnd, aMonitorRect))
-				return false;
-			aTgtW = aMonitorRect.right - aMonitorRect.left;
-			aTgtH = aMonitorRect.bottom - aMonitorRect.top;
-#else
-			if (!mNativeWindow) return false;
-			aTgtW = mNativeWindow->Width;
-			aTgtH = mNativeWindow->Height;
-#endif
-		}
-		if (aTgtW <= 0 || aTgtH <= 0)
-			return false;
-		return ScaleEffectSizing::ComputePipelineOutputSize(
-			aEffects, aScalings, theSrcW, theSrcH, aTgtW, aTgtH, outW, outH);
-	}
-
-	bool SexyAppBase::GetCustomScalePresentSize(int& outW, int& outH)
-	{
-		return GetCustomScalePresentSizeForMode(mIsWindowed, outW, outH);
-	}
-
-	bool SexyAppBase::GetCustomScalePresentSizeForMode(
-		bool theWindowed, int& outW, int& outH)
-	{
-		if (!IsScalePresentActiveForMode(theWindowed))
-			return false;
-		return ComputeCustomScaleOutputSize(theWindowed, mWidth, mHeight, outW, outH);
-	}
-
-	int SexyAppBase::GetWindowScaleForCustomScale() const
-	{
-		if (!mScaleWindowConfig.mEffects.empty())
-			return std::max(1, mWindowScaleFromPipeline);
-		return std::max(1, mScaleConfigWindow);
-	}
-
-	void SexyAppBase::UpdateWindowScaleFromPipeline()
-	{
-		mWindowScaleFromPipeline = 1;
-		std::vector<ScaleEffectRuntimeDesc*> aEffects;
-		std::vector<ScaleEffectScaling> aScalings;
-		if (!BuildScalePipelineForMode(true, aEffects, aScalings))
-			return;
-
-		int aW = 0;
-		int aH = 0;
-		if (!ScaleEffectSizing::ComputePipelineOutputSize(
-			aEffects, aScalings, 800, 600, 800, 600, aW, aH))
-			return;
-		if (aW >= 800 && aW % 800 == 0 && aH >= 600 && aH % 600 == 0)
-			mWindowScaleFromPipeline = std::max(1, aW / 800);
-	}
-
-void SexyAppBase::CleanupScalePresent()
-{
 }
 
 SharedImageRef SexyAppBase::LoadSharedImage(const std::string& file, unsigned variant,

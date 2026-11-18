@@ -2,7 +2,8 @@
 namespace ResourceLoadBindings
 {
 namespace {
-Sexy::SharedImageRef owner_IMAGE_AWARDSCREEN_BACK;
+Sexy::SharedImageRef owner_IMAGE_AWARDSCREEN_PANEL;
+Sexy::SharedImageRef owner_IMAGE_AWARDSCREEN_FRAME;
 Sexy::SharedImageRef owner_IMAGE_BACKGROUND1;
 Sexy::SharedImageRef owner_IMAGE_BACKGROUND1_GAMEOVER_INTERIOR_OVERLAY;
 Sexy::SharedImageRef owner_IMAGE_BACKGROUND1_GAMEOVER_MASK;
@@ -44,7 +45,6 @@ Sexy::SharedImageRef owner_IMAGE_STORE_CAR;
 Sexy::SharedImageRef owner_IMAGE_STORE_CAR_NIGHT;
 Sexy::SharedImageRef owner_IMAGE_STORE_CARCLOSED;
 Sexy::SharedImageRef owner_IMAGE_STORE_CARCLOSED_NIGHT;
-Sexy::SharedImageRef owner_IMAGE_STORE_HATCHBACKOPEN;
 Sexy::SharedImageRef owner_IMAGE_STORE_SIGN;
 Sexy::SharedImageRef owner_IMAGE_STORE_MAINMENUBUTTON;
 Sexy::SharedImageRef owner_IMAGE_STORE_MAINMENUBUTTONDOWN;
@@ -70,7 +70,6 @@ Sexy::SharedImageRef owner_IMAGE_ZOMBIE_NOTE4;
 Sexy::SharedImageRef owner_IMAGE_ZOMBIE_NOTE_HELP;
 Sexy::SharedImageRef owner_IMAGE_AQUARIUM1;
 Sexy::SharedImageRef owner_IMAGE_WAVECENTER;
-Sexy::SharedImageRef owner_IMAGE_WAVESIDE;
 Sexy::SharedImageRef owner_IMAGE_BLANK;
 Sexy::SharedImageRef owner_IMAGE_POPCAP_LOGO;
 Sexy::SharedImageRef owner_IMAGE_TITLESCREEN;
@@ -84,7 +83,6 @@ Sexy::SharedImageRef owner_IMAGE_SEEDPACKET_LARGER;
 Sexy::SharedImageRef owner_IMAGE_FLAGMETER;
 Sexy::SharedImageRef owner_IMAGE_FLAGMETERLEVELPROGRESS;
 Sexy::SharedImageRef owner_IMAGE_FLAGMETERPARTS;
-Sexy::SharedImageRef owner_IMAGE_TROPHY;
 Sexy::SharedImageRef owner_IMAGE_TROPHY_HI_RES;
 Sexy::SharedImageRef owner_IMAGE_MINIGAME_TROPHY;
 Sexy::SharedImageRef owner_IMAGE_ZOMBIE_NOTE_SMALL;
@@ -98,7 +96,6 @@ Sexy::SharedImageRef owner_IMAGE_BRAIN;
 Sexy::SharedImageRef owner_IMAGE_MONEYBAG_HI_RES;
 Sexy::SharedImageRef owner_IMAGE_CHOCOLATE;
 Sexy::SharedImageRef owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON0;
-Sexy::SharedImageRef owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON2;
 Sexy::SharedImageRef owner_IMAGE_OPTIONS_CHECKBOX0;
 Sexy::SharedImageRef owner_IMAGE_OPTIONS_CHECKBOX1;
 Sexy::SharedImageRef owner_IMAGE_OPTIONS_MENUBACK;
@@ -154,7 +151,6 @@ Sexy::SharedImageRef owner_IMAGE_BUG_SPRAY;
 Sexy::SharedImageRef owner_IMAGE_PLANTSPEECHBUBBLE;
 Sexy::SharedImageRef owner_IMAGE_WATERDROP;
 Sexy::SharedImageRef owner_IMAGE_TREEFOOD;
-Sexy::SharedImageRef owner_IMAGE_ZEN_NEED_ICONS;
 Sexy::SharedImageRef owner_IMAGE_WHITEWATER_SHADOW;
 Sexy::SharedImageRef owner_IMAGE_SEEDBANK;
 Sexy::SharedImageRef owner_IMAGE_CONVEYORBELT_BACKDROP;
@@ -163,18 +159,12 @@ Sexy::SharedImageRef owner_IMAGE_SHOVELBANK;
 Sexy::SharedImageRef owner_IMAGE_SUNBANK;
 Sexy::SharedImageRef owner_IMAGE_COINBANK;
 Sexy::SharedImageRef owner_IMAGE_POOL;
-Sexy::SharedImageRef owner_IMAGE_POOL_BASE;
-Sexy::SharedImageRef owner_IMAGE_POOL_BASE_NIGHT;
-Sexy::SharedImageRef owner_IMAGE_POOL_SHADING;
-Sexy::SharedImageRef owner_IMAGE_POOL_SHADING_NIGHT;
 Sexy::SharedImageRef owner_IMAGE_POOL_CAUSTIC_EFFECT;
 Sexy::SharedImageRef owner_IMAGE_PLANTSHADOW;
 Sexy::SharedImageRef owner_IMAGE_PLANTSHADOW2;
 Sexy::SharedImageRef owner_IMAGE_WALLNUT_BOWLINGSTRIPE;
 Sexy::SharedImageRef owner_IMAGE_ICE;
 Sexy::SharedImageRef owner_IMAGE_ICE_CAP;
-Sexy::SharedImageRef owner_IMAGE_IMITATERSEED;
-Sexy::SharedImageRef owner_IMAGE_IMITATERSEEDDISABLED;
 Sexy::SharedImageRef owner_IMAGE_ICETRAP;
 Sexy::SharedImageRef owner_IMAGE_ICETRAP2;
 Sexy::SharedImageRef owner_IMAGE_ZOMBIE_BOBSLED1;
@@ -198,15 +188,15 @@ Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON;
 Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT;
 Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON;
 Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT;
+Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_BUTTON;
+Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_HIGHLIGHT;
+Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_PUZZLE_BUTTON;
+Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_PUZZLE_HIGHLIGHT;
 Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON;
 Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT;
-Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON;
-Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT;
-Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON;
-Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT;
 Sexy::SharedImageRef owner_IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS;
-Sexy::SharedImageRef owner_IMAGE_REANIM_TREE_BG;
 Sexy::SharedImageRef owner_IMAGE_REANIM_STINKY_TURN3;
+Sexy::SharedImageRef owner_IMAGE_BACKGROUND_TREEOFWISDOM;
 }
 bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& plan,
               ResourceGroupId group, unsigned step)
@@ -221,7 +211,8 @@ bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& p
     case ResourceGroupId::DelayLoad_AwardScreen:
         switch (step)
         {
-        case 0: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_AWARDSCREEN_BACK, owner_IMAGE_AWARDSCREEN_BACK);
+        case 0: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_AWARDSCREEN_PANEL, owner_IMAGE_AWARDSCREEN_PANEL);
+        case 1: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_AWARDSCREEN_FRAME, owner_IMAGE_AWARDSCREEN_FRAME);
         default: return false;
         }
     case ResourceGroupId::DelayLoad_Background1:
@@ -296,11 +287,12 @@ bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& p
         switch (step)
         {
         case 0: return manager.LoadFont(plan.mFonts[plan.mNextFont++], Sexy::FONT_BRIANNETOD32);
-        case 1: return manager.LoadFont(plan.mFonts[plan.mNextFont++], Sexy::FONT_BRIANNETOD32BLACK);
-        case 2: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_CREDITS_DISCOLIGHTS, owner_IMAGE_REANIM_CREDITS_DISCOLIGHTS);
-        case 3: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_CREDITS_FOGMACHINE, owner_IMAGE_REANIM_CREDITS_FOGMACHINE);
-        case 4: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CREDITS_ZOMBIENOTE, owner_IMAGE_CREDITS_ZOMBIENOTE);
-        case 5: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CREDITS_PLAYBUTTON, owner_IMAGE_CREDITS_PLAYBUTTON);
+        case 1: return manager.LoadFont(plan.mFonts[plan.mNextFont++], Sexy::FONT_BRIANNETOD32PLAIN);
+        case 2: return manager.LoadFont(plan.mFonts[plan.mNextFont++], Sexy::FONT_BRIANNETOD32BLACK);
+        case 3: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_CREDITS_DISCOLIGHTS, owner_IMAGE_REANIM_CREDITS_DISCOLIGHTS);
+        case 4: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_CREDITS_FOGMACHINE, owner_IMAGE_REANIM_CREDITS_FOGMACHINE);
+        case 5: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CREDITS_ZOMBIENOTE, owner_IMAGE_CREDITS_ZOMBIENOTE);
+        case 6: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CREDITS_PLAYBUTTON, owner_IMAGE_CREDITS_PLAYBUTTON);
         default: return false;
         }
     case ResourceGroupId::DelayLoad_GreenHouseGarden:
@@ -330,23 +322,22 @@ bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& p
         case 3: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_CAR_NIGHT, owner_IMAGE_STORE_CAR_NIGHT);
         case 4: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_CARCLOSED, owner_IMAGE_STORE_CARCLOSED);
         case 5: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_CARCLOSED_NIGHT, owner_IMAGE_STORE_CARCLOSED_NIGHT);
-        case 6: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_HATCHBACKOPEN, owner_IMAGE_STORE_HATCHBACKOPEN);
-        case 7: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_SIGN, owner_IMAGE_STORE_SIGN);
-        case 8: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MAINMENUBUTTON, owner_IMAGE_STORE_MAINMENUBUTTON);
-        case 9: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MAINMENUBUTTONDOWN, owner_IMAGE_STORE_MAINMENUBUTTONDOWN);
-        case 10: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MAINMENUBUTTONHIGHLIGHT, owner_IMAGE_STORE_MAINMENUBUTTONHIGHLIGHT);
-        case 11: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_NEXTBUTTON, owner_IMAGE_STORE_NEXTBUTTON);
-        case 12: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_NEXTBUTTONHIGHLIGHT, owner_IMAGE_STORE_NEXTBUTTONHIGHLIGHT);
-        case 13: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_NEXTBUTTONDISABLED, owner_IMAGE_STORE_NEXTBUTTONDISABLED);
-        case 14: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PREVBUTTON, owner_IMAGE_STORE_PREVBUTTON);
-        case 15: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PREVBUTTONHIGHLIGHT, owner_IMAGE_STORE_PREVBUTTONHIGHLIGHT);
-        case 16: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PREVBUTTONDISABLED, owner_IMAGE_STORE_PREVBUTTONDISABLED);
-        case 17: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PRICETAG, owner_IMAGE_STORE_PRICETAG);
-        case 18: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PACKETUPGRADE, owner_IMAGE_STORE_PACKETUPGRADE);
-        case 19: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MUSHROOMGARDENICON, owner_IMAGE_STORE_MUSHROOMGARDENICON);
-        case 20: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_AQUARIUMGARDENICON, owner_IMAGE_STORE_AQUARIUMGARDENICON);
-        case 21: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_TREEOFWISDOMICON, owner_IMAGE_STORE_TREEOFWISDOMICON);
-        case 22: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_FIRSTAIDWALLNUTICON, owner_IMAGE_STORE_FIRSTAIDWALLNUTICON);
+        case 6: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_SIGN, owner_IMAGE_STORE_SIGN);
+        case 7: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MAINMENUBUTTON, owner_IMAGE_STORE_MAINMENUBUTTON);
+        case 8: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MAINMENUBUTTONDOWN, owner_IMAGE_STORE_MAINMENUBUTTONDOWN);
+        case 9: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MAINMENUBUTTONHIGHLIGHT, owner_IMAGE_STORE_MAINMENUBUTTONHIGHLIGHT);
+        case 10: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_NEXTBUTTON, owner_IMAGE_STORE_NEXTBUTTON);
+        case 11: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_NEXTBUTTONHIGHLIGHT, owner_IMAGE_STORE_NEXTBUTTONHIGHLIGHT);
+        case 12: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_NEXTBUTTONDISABLED, owner_IMAGE_STORE_NEXTBUTTONDISABLED);
+        case 13: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PREVBUTTON, owner_IMAGE_STORE_PREVBUTTON);
+        case 14: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PREVBUTTONHIGHLIGHT, owner_IMAGE_STORE_PREVBUTTONHIGHLIGHT);
+        case 15: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PREVBUTTONDISABLED, owner_IMAGE_STORE_PREVBUTTONDISABLED);
+        case 16: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PRICETAG, owner_IMAGE_STORE_PRICETAG);
+        case 17: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_PACKETUPGRADE, owner_IMAGE_STORE_PACKETUPGRADE);
+        case 18: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_MUSHROOMGARDENICON, owner_IMAGE_STORE_MUSHROOMGARDENICON);
+        case 19: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_AQUARIUMGARDENICON, owner_IMAGE_STORE_AQUARIUMGARDENICON);
+        case 20: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_TREEOFWISDOMICON, owner_IMAGE_STORE_TREEOFWISDOMICON);
+        case 21: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_FIRSTAIDWALLNUTICON, owner_IMAGE_STORE_FIRSTAIDWALLNUTICON);
         default: return false;
         }
     case ResourceGroupId::DelayLoad_Zombatar:
@@ -401,7 +392,6 @@ bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& p
         {
         case 0: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_AQUARIUM1, owner_IMAGE_AQUARIUM1);
         case 1: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WAVECENTER, owner_IMAGE_WAVECENTER);
-        case 2: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WAVESIDE, owner_IMAGE_WAVESIDE);
         default: return false;
         }
     case ResourceGroupId::Init:
@@ -456,129 +446,119 @@ bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& p
         case 3: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_FLAGMETER, owner_IMAGE_FLAGMETER);
         case 4: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_FLAGMETERLEVELPROGRESS, owner_IMAGE_FLAGMETERLEVELPROGRESS);
         case 5: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_FLAGMETERPARTS, owner_IMAGE_FLAGMETERPARTS);
-        case 6: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TROPHY, owner_IMAGE_TROPHY);
-        case 7: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TROPHY_HI_RES, owner_IMAGE_TROPHY_HI_RES);
-        case 8: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_MINIGAME_TROPHY, owner_IMAGE_MINIGAME_TROPHY);
-        case 9: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_NOTE_SMALL, owner_IMAGE_ZOMBIE_NOTE_SMALL);
-        case 10: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TACO, owner_IMAGE_TACO);
-        case 11: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CARKEYS, owner_IMAGE_CARKEYS);
-        case 12: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ALMANAC, owner_IMAGE_ALMANAC);
-        case 13: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICON_POOLCLEANER, owner_IMAGE_ICON_POOLCLEANER);
-        case 14: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICON_ROOFCLEANER, owner_IMAGE_ICON_ROOFCLEANER);
-        case 15: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICON_RAKE, owner_IMAGE_ICON_RAKE);
-        case 16: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BRAIN, owner_IMAGE_BRAIN);
-        case 17: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_MONEYBAG_HI_RES, owner_IMAGE_MONEYBAG_HI_RES);
-        case 18: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CHOCOLATE, owner_IMAGE_CHOCOLATE);
-        case 19: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_BACKTOGAMEBUTTON0, owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON0);
-        case 20: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_BACKTOGAMEBUTTON2, owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON2);
-        case 21: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_CHECKBOX0, owner_IMAGE_OPTIONS_CHECKBOX0);
-        case 22: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_CHECKBOX1, owner_IMAGE_OPTIONS_CHECKBOX1);
-        case 23: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_MENUBACK, owner_IMAGE_OPTIONS_MENUBACK);
-        case 24: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_SLIDERKNOB2, owner_IMAGE_OPTIONS_SLIDERKNOB2);
-        case 25: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_SLIDERSLOT, owner_IMAGE_OPTIONS_SLIDERSLOT);
-        case 26: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_HELP1, owner_IMAGE_SELECTORSCREEN_HELP1);
-        case 27: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_HELP2, owner_IMAGE_SELECTORSCREEN_HELP2);
-        case 28: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_OPTIONS1, owner_IMAGE_SELECTORSCREEN_OPTIONS1);
-        case 29: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_OPTIONS2, owner_IMAGE_SELECTORSCREEN_OPTIONS2);
-        case 30: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_QUIT1, owner_IMAGE_SELECTORSCREEN_QUIT1);
-        case 31: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_QUIT2, owner_IMAGE_SELECTORSCREEN_QUIT2);
-        case 32: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ALMANAC, owner_IMAGE_SELECTORSCREEN_ALMANAC);
-        case 33: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ALMANACHIGHLIGHT, owner_IMAGE_SELECTORSCREEN_ALMANACHIGHLIGHT);
-        case 34: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_STORE, owner_IMAGE_SELECTORSCREEN_STORE);
-        case 35: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_STOREHIGHLIGHT, owner_IMAGE_SELECTORSCREEN_STOREHIGHLIGHT);
-        case 36: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_LEVELNUMBERS, owner_IMAGE_SELECTORSCREEN_LEVELNUMBERS);
-        case 37: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ZENGARDEN, owner_IMAGE_SELECTORSCREEN_ZENGARDEN);
-        case 38: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ZENGARDENHIGHLIGHT, owner_IMAGE_SELECTORSCREEN_ZENGARDENHIGHLIGHT);
-        case 39: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_SPEECHBUBBLE, owner_IMAGE_STORE_SPEECHBUBBLE);
-        case 40: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_SPEECHBUBBLE2, owner_IMAGE_STORE_SPEECHBUBBLE2);
-        case 41: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL, owner_IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL);
-        case 42: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL_PRESS, owner_IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL_PRESS);
-        case 43: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SHOVEL, owner_IMAGE_SHOVEL);
-        case 44: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SHOVEL_HI_RES, owner_IMAGE_SHOVEL_HI_RES);
-        case 45: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TOMBSTONES, owner_IMAGE_TOMBSTONES);
-        case 46: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TOMBSTONE_MOUNDS, owner_IMAGE_TOMBSTONE_MOUNDS);
-        case 47: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_NIGHT_GRAVE_GRAPHIC, owner_IMAGE_NIGHT_GRAVE_GRAPHIC);
-        case 48: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER, owner_IMAGE_CRATER);
-        case 49: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_FADING, owner_IMAGE_CRATER_FADING);
-        case 50: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_ROOF_CENTER, owner_IMAGE_CRATER_ROOF_CENTER);
-        case 51: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_ROOF_LEFT, owner_IMAGE_CRATER_ROOF_LEFT);
-        case 52: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_WATER_DAY, owner_IMAGE_CRATER_WATER_DAY);
-        case 53: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_WATER_NIGHT, owner_IMAGE_CRATER_WATER_NIGHT);
-        case 54: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_COBCANNON_TARGET, owner_IMAGE_COBCANNON_TARGET);
-        case 55: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_FERTILIZER, owner_IMAGE_FERTILIZER);
-        case 56: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WATERINGCAN, owner_IMAGE_WATERINGCAN);
-        case 57: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WATERINGCANGOLD, owner_IMAGE_WATERINGCANGOLD);
-        case 58: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PHONOGRAPH, owner_IMAGE_PHONOGRAPH);
-        case 59: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BEGHOULED_TWIST_OVERLAY, owner_IMAGE_BEGHOULED_TWIST_OVERLAY);
-        case 60: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_GOLDTOOLRETICLE, owner_IMAGE_ZEN_GOLDTOOLRETICLE);
-        case 61: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_GARDENGLOVE, owner_IMAGE_ZEN_GARDENGLOVE);
-        case 62: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_MONEYSIGN, owner_IMAGE_ZEN_MONEYSIGN);
-        case 63: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_NEXTGARDEN, owner_IMAGE_ZEN_NEXTGARDEN);
-        case 64: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_WHEELBARROW, owner_IMAGE_ZEN_WHEELBARROW);
-        case 65: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZENSHOPBUTTON, owner_IMAGE_ZENSHOPBUTTON);
-        case 66: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZENSHOPBUTTON_HIGHLIGHT, owner_IMAGE_ZENSHOPBUTTON_HIGHLIGHT);
-        case 67: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PRESENT, owner_IMAGE_PRESENT);
-        case 68: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PRESENTOPEN, owner_IMAGE_PRESENTOPEN);
-        case 69: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SUNFLOWER_TROPHY, owner_IMAGE_SUNFLOWER_TROPHY);
-        case 70: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SLOTMACHINE_OVERLAY, owner_IMAGE_SLOTMACHINE_OVERLAY);
-        case 71: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SCARY_POT, owner_IMAGE_SCARY_POT);
-        case 72: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BUG_SPRAY, owner_IMAGE_BUG_SPRAY);
-        case 73: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PLANTSPEECHBUBBLE, owner_IMAGE_PLANTSPEECHBUBBLE);
-        case 74: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WATERDROP, owner_IMAGE_WATERDROP);
-        case 75: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TREEFOOD, owner_IMAGE_TREEFOOD);
-        case 76: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_NEED_ICONS, owner_IMAGE_ZEN_NEED_ICONS);
-        case 77: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WHITEWATER_SHADOW, owner_IMAGE_WHITEWATER_SHADOW);
-        case 78: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SEEDBANK, owner_IMAGE_SEEDBANK);
-        case 79: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CONVEYORBELT_BACKDROP, owner_IMAGE_CONVEYORBELT_BACKDROP);
-        case 80: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CONVEYORBELT, owner_IMAGE_CONVEYORBELT);
-        case 81: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SHOVELBANK, owner_IMAGE_SHOVELBANK);
-        case 82: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SUNBANK, owner_IMAGE_SUNBANK);
-        case 83: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_COINBANK, owner_IMAGE_COINBANK);
-        case 84: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL, owner_IMAGE_POOL);
-        case 85: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL_BASE, owner_IMAGE_POOL_BASE);
-        case 86: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL_BASE_NIGHT, owner_IMAGE_POOL_BASE_NIGHT);
-        case 87: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL_SHADING, owner_IMAGE_POOL_SHADING);
-        case 88: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL_SHADING_NIGHT, owner_IMAGE_POOL_SHADING_NIGHT);
-        case 89: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL_CAUSTIC_EFFECT, owner_IMAGE_POOL_CAUSTIC_EFFECT);
-        case 90: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PLANTSHADOW, owner_IMAGE_PLANTSHADOW);
-        case 91: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PLANTSHADOW2, owner_IMAGE_PLANTSHADOW2);
-        case 92: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WALLNUT_BOWLINGSTRIPE, owner_IMAGE_WALLNUT_BOWLINGSTRIPE);
-        case 93: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICE, owner_IMAGE_ICE);
-        case 94: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICE_CAP, owner_IMAGE_ICE_CAP);
-        case 95: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_IMITATERSEED, owner_IMAGE_IMITATERSEED);
-        case 96: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_IMITATERSEEDDISABLED, owner_IMAGE_IMITATERSEEDDISABLED);
-        case 97: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICETRAP, owner_IMAGE_ICETRAP);
-        case 98: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICETRAP2, owner_IMAGE_ICETRAP2);
-        case 99: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED1, owner_IMAGE_ZOMBIE_BOBSLED1);
-        case 100: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED2, owner_IMAGE_ZOMBIE_BOBSLED2);
-        case 101: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED3, owner_IMAGE_ZOMBIE_BOBSLED3);
-        case 102: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED4, owner_IMAGE_ZOMBIE_BOBSLED4);
-        case 103: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED_INSIDE, owner_IMAGE_ZOMBIE_BOBSLED_INSIDE);
-        case 104: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BUNGEECORD, owner_IMAGE_BUNGEECORD);
-        case 105: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BUNGEETARGET, owner_IMAGE_BUNGEETARGET);
-        case 106: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SPOTLIGHT, owner_IMAGE_SPOTLIGHT);
-        case 107: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SPOTLIGHT2, owner_IMAGE_SPOTLIGHT2);
-        case 108: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SEEDPACKETFLASH, owner_IMAGE_SEEDPACKETFLASH);
-        case 109: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_RAIN, owner_IMAGE_RAIN);
-        case 110: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_AWARDPICKUPGLOW, owner_IMAGE_AWARDPICKUPGLOW);
-        case 111: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_WALLNUT_BODY, owner_IMAGE_REANIM_WALLNUT_BODY);
-        case 112: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_COIN_SILVER_DOLLAR, owner_IMAGE_REANIM_COIN_SILVER_DOLLAR);
-        case 113: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_COIN_GOLD_DOLLAR, owner_IMAGE_REANIM_COIN_GOLD_DOLLAR);
-        case 114: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_COINGLOW, owner_IMAGE_REANIM_COINGLOW);
-        case 115: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_CORNPULT_BUTTER_SPLAT, owner_IMAGE_REANIM_CORNPULT_BUTTER_SPLAT);
-        case 116: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON);
-        case 117: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT);
-        case 118: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON);
-        case 119: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT);
-        case 120: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON);
-        case 121: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT);
-        case 122: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON);
-        case 123: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT);
-        case 124: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON);
-        case 125: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT);
-        case 126: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS, owner_IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS);
-        case 127: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_TREE_BG, owner_IMAGE_REANIM_TREE_BG);
-        case 128: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_STINKY_TURN3, owner_IMAGE_REANIM_STINKY_TURN3);
+        case 6: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TROPHY_HI_RES, owner_IMAGE_TROPHY_HI_RES);
+        case 7: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_MINIGAME_TROPHY, owner_IMAGE_MINIGAME_TROPHY);
+        case 8: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_NOTE_SMALL, owner_IMAGE_ZOMBIE_NOTE_SMALL);
+        case 9: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TACO, owner_IMAGE_TACO);
+        case 10: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CARKEYS, owner_IMAGE_CARKEYS);
+        case 11: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ALMANAC, owner_IMAGE_ALMANAC);
+        case 12: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICON_POOLCLEANER, owner_IMAGE_ICON_POOLCLEANER);
+        case 13: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICON_ROOFCLEANER, owner_IMAGE_ICON_ROOFCLEANER);
+        case 14: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICON_RAKE, owner_IMAGE_ICON_RAKE);
+        case 15: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BRAIN, owner_IMAGE_BRAIN);
+        case 16: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_MONEYBAG_HI_RES, owner_IMAGE_MONEYBAG_HI_RES);
+        case 17: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CHOCOLATE, owner_IMAGE_CHOCOLATE);
+        case 18: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_BACKTOGAMEBUTTON0, owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON0);
+        case 19: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_CHECKBOX0, owner_IMAGE_OPTIONS_CHECKBOX0);
+        case 20: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_CHECKBOX1, owner_IMAGE_OPTIONS_CHECKBOX1);
+        case 21: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_MENUBACK, owner_IMAGE_OPTIONS_MENUBACK);
+        case 22: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_SLIDERKNOB2, owner_IMAGE_OPTIONS_SLIDERKNOB2);
+        case 23: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_OPTIONS_SLIDERSLOT, owner_IMAGE_OPTIONS_SLIDERSLOT);
+        case 24: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_HELP1, owner_IMAGE_SELECTORSCREEN_HELP1);
+        case 25: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_HELP2, owner_IMAGE_SELECTORSCREEN_HELP2);
+        case 26: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_OPTIONS1, owner_IMAGE_SELECTORSCREEN_OPTIONS1);
+        case 27: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_OPTIONS2, owner_IMAGE_SELECTORSCREEN_OPTIONS2);
+        case 28: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_QUIT1, owner_IMAGE_SELECTORSCREEN_QUIT1);
+        case 29: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_QUIT2, owner_IMAGE_SELECTORSCREEN_QUIT2);
+        case 30: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ALMANAC, owner_IMAGE_SELECTORSCREEN_ALMANAC);
+        case 31: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ALMANACHIGHLIGHT, owner_IMAGE_SELECTORSCREEN_ALMANACHIGHLIGHT);
+        case 32: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_STORE, owner_IMAGE_SELECTORSCREEN_STORE);
+        case 33: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_STOREHIGHLIGHT, owner_IMAGE_SELECTORSCREEN_STOREHIGHLIGHT);
+        case 34: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_LEVELNUMBERS, owner_IMAGE_SELECTORSCREEN_LEVELNUMBERS);
+        case 35: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ZENGARDEN, owner_IMAGE_SELECTORSCREEN_ZENGARDEN);
+        case 36: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ZENGARDENHIGHLIGHT, owner_IMAGE_SELECTORSCREEN_ZENGARDENHIGHLIGHT);
+        case 37: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_SPEECHBUBBLE, owner_IMAGE_STORE_SPEECHBUBBLE);
+        case 38: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_STORE_SPEECHBUBBLE2, owner_IMAGE_STORE_SPEECHBUBBLE2);
+        case 39: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL, owner_IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL);
+        case 40: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL_PRESS, owner_IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL_PRESS);
+        case 41: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SHOVEL, owner_IMAGE_SHOVEL);
+        case 42: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SHOVEL_HI_RES, owner_IMAGE_SHOVEL_HI_RES);
+        case 43: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TOMBSTONES, owner_IMAGE_TOMBSTONES);
+        case 44: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TOMBSTONE_MOUNDS, owner_IMAGE_TOMBSTONE_MOUNDS);
+        case 45: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_NIGHT_GRAVE_GRAPHIC, owner_IMAGE_NIGHT_GRAVE_GRAPHIC);
+        case 46: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER, owner_IMAGE_CRATER);
+        case 47: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_FADING, owner_IMAGE_CRATER_FADING);
+        case 48: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_ROOF_CENTER, owner_IMAGE_CRATER_ROOF_CENTER);
+        case 49: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_ROOF_LEFT, owner_IMAGE_CRATER_ROOF_LEFT);
+        case 50: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_WATER_DAY, owner_IMAGE_CRATER_WATER_DAY);
+        case 51: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CRATER_WATER_NIGHT, owner_IMAGE_CRATER_WATER_NIGHT);
+        case 52: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_COBCANNON_TARGET, owner_IMAGE_COBCANNON_TARGET);
+        case 53: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_FERTILIZER, owner_IMAGE_FERTILIZER);
+        case 54: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WATERINGCAN, owner_IMAGE_WATERINGCAN);
+        case 55: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WATERINGCANGOLD, owner_IMAGE_WATERINGCANGOLD);
+        case 56: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PHONOGRAPH, owner_IMAGE_PHONOGRAPH);
+        case 57: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BEGHOULED_TWIST_OVERLAY, owner_IMAGE_BEGHOULED_TWIST_OVERLAY);
+        case 58: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_GOLDTOOLRETICLE, owner_IMAGE_ZEN_GOLDTOOLRETICLE);
+        case 59: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_GARDENGLOVE, owner_IMAGE_ZEN_GARDENGLOVE);
+        case 60: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_MONEYSIGN, owner_IMAGE_ZEN_MONEYSIGN);
+        case 61: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_NEXTGARDEN, owner_IMAGE_ZEN_NEXTGARDEN);
+        case 62: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZEN_WHEELBARROW, owner_IMAGE_ZEN_WHEELBARROW);
+        case 63: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZENSHOPBUTTON, owner_IMAGE_ZENSHOPBUTTON);
+        case 64: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZENSHOPBUTTON_HIGHLIGHT, owner_IMAGE_ZENSHOPBUTTON_HIGHLIGHT);
+        case 65: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PRESENT, owner_IMAGE_PRESENT);
+        case 66: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PRESENTOPEN, owner_IMAGE_PRESENTOPEN);
+        case 67: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SUNFLOWER_TROPHY, owner_IMAGE_SUNFLOWER_TROPHY);
+        case 68: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SLOTMACHINE_OVERLAY, owner_IMAGE_SLOTMACHINE_OVERLAY);
+        case 69: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SCARY_POT, owner_IMAGE_SCARY_POT);
+        case 70: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BUG_SPRAY, owner_IMAGE_BUG_SPRAY);
+        case 71: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PLANTSPEECHBUBBLE, owner_IMAGE_PLANTSPEECHBUBBLE);
+        case 72: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WATERDROP, owner_IMAGE_WATERDROP);
+        case 73: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_TREEFOOD, owner_IMAGE_TREEFOOD);
+        case 74: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WHITEWATER_SHADOW, owner_IMAGE_WHITEWATER_SHADOW);
+        case 75: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SEEDBANK, owner_IMAGE_SEEDBANK);
+        case 76: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CONVEYORBELT_BACKDROP, owner_IMAGE_CONVEYORBELT_BACKDROP);
+        case 77: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_CONVEYORBELT, owner_IMAGE_CONVEYORBELT);
+        case 78: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SHOVELBANK, owner_IMAGE_SHOVELBANK);
+        case 79: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SUNBANK, owner_IMAGE_SUNBANK);
+        case 80: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_COINBANK, owner_IMAGE_COINBANK);
+        case 81: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL, owner_IMAGE_POOL);
+        case 82: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_POOL_CAUSTIC_EFFECT, owner_IMAGE_POOL_CAUSTIC_EFFECT);
+        case 83: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PLANTSHADOW, owner_IMAGE_PLANTSHADOW);
+        case 84: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_PLANTSHADOW2, owner_IMAGE_PLANTSHADOW2);
+        case 85: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_WALLNUT_BOWLINGSTRIPE, owner_IMAGE_WALLNUT_BOWLINGSTRIPE);
+        case 86: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICE, owner_IMAGE_ICE);
+        case 87: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICE_CAP, owner_IMAGE_ICE_CAP);
+        case 88: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICETRAP, owner_IMAGE_ICETRAP);
+        case 89: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ICETRAP2, owner_IMAGE_ICETRAP2);
+        case 90: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED1, owner_IMAGE_ZOMBIE_BOBSLED1);
+        case 91: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED2, owner_IMAGE_ZOMBIE_BOBSLED2);
+        case 92: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED3, owner_IMAGE_ZOMBIE_BOBSLED3);
+        case 93: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED4, owner_IMAGE_ZOMBIE_BOBSLED4);
+        case 94: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_ZOMBIE_BOBSLED_INSIDE, owner_IMAGE_ZOMBIE_BOBSLED_INSIDE);
+        case 95: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BUNGEECORD, owner_IMAGE_BUNGEECORD);
+        case 96: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BUNGEETARGET, owner_IMAGE_BUNGEETARGET);
+        case 97: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SPOTLIGHT, owner_IMAGE_SPOTLIGHT);
+        case 98: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SPOTLIGHT2, owner_IMAGE_SPOTLIGHT2);
+        case 99: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_SEEDPACKETFLASH, owner_IMAGE_SEEDPACKETFLASH);
+        case 100: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_RAIN, owner_IMAGE_RAIN);
+        case 101: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_AWARDPICKUPGLOW, owner_IMAGE_AWARDPICKUPGLOW);
+        case 102: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_WALLNUT_BODY, owner_IMAGE_REANIM_WALLNUT_BODY);
+        case 103: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_COIN_SILVER_DOLLAR, owner_IMAGE_REANIM_COIN_SILVER_DOLLAR);
+        case 104: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_COIN_GOLD_DOLLAR, owner_IMAGE_REANIM_COIN_GOLD_DOLLAR);
+        case 105: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_COINGLOW, owner_IMAGE_REANIM_COINGLOW);
+        case 106: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_CORNPULT_BUTTER_SPLAT, owner_IMAGE_REANIM_CORNPULT_BUTTER_SPLAT);
+        case 107: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_BUTTON);
+        case 108: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT);
+        case 109: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON);
+        case 110: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT);
+        case 111: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_BUTTON);
+        case 112: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_HIGHLIGHT);
+        case 113: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_PUZZLE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_PUZZLE_BUTTON);
+        case 114: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_PUZZLE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_PUZZLE_HIGHLIGHT);
+        case 115: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON);
+        case 116: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT);
+        case 117: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS, owner_IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS);
+        case 118: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_REANIM_STINKY_TURN3, owner_IMAGE_REANIM_STINKY_TURN3);
         default: return false;
         }
     case ResourceGroupId::LoadingSounds:
@@ -751,6 +731,12 @@ bool LoadStep(Sexy::ResourceManager& manager, Sexy::ResourceManager::LoadPlan& p
         case 164: return manager.LoadSound(plan.mSounds[plan.mNextSound++], Sexy::SOUND_CRAZYDAVESCREAM2);
         default: return false;
         }
+    case ResourceGroupId::DelayLoad_TreeOfWisdom:
+        switch (step)
+        {
+        case 0: return manager.LoadImage(plan.mImages[plan.mNextImage++], Sexy::IMAGE_BACKGROUND_TREEOFWISDOM, owner_IMAGE_BACKGROUND_TREEOFWISDOM);
+        default: return false;
+        }
     default: return false;
     }
 }
@@ -761,7 +747,8 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
     case ResourceGroupId::DelayLoad_Almanac:
         break;
     case ResourceGroupId::DelayLoad_AwardScreen:
-        manager.ReleaseImage(Sexy::IMAGE_AWARDSCREEN_BACK, owner_IMAGE_AWARDSCREEN_BACK);
+        manager.ReleaseImage(Sexy::IMAGE_AWARDSCREEN_FRAME, owner_IMAGE_AWARDSCREEN_FRAME);
+        manager.ReleaseImage(Sexy::IMAGE_AWARDSCREEN_PANEL, owner_IMAGE_AWARDSCREEN_PANEL);
         break;
     case ResourceGroupId::DelayLoad_Background1:
         manager.ReleaseImage(Sexy::IMAGE_BACKGROUND1_GAMEOVER_MASK, owner_IMAGE_BACKGROUND1_GAMEOVER_MASK);
@@ -813,6 +800,7 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_REANIM_CREDITS_FOGMACHINE, owner_IMAGE_REANIM_CREDITS_FOGMACHINE);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_CREDITS_DISCOLIGHTS, owner_IMAGE_REANIM_CREDITS_DISCOLIGHTS);
         manager.ReleaseFont(Sexy::FONT_BRIANNETOD32BLACK);
+        manager.ReleaseFont(Sexy::FONT_BRIANNETOD32PLAIN);
         manager.ReleaseFont(Sexy::FONT_BRIANNETOD32);
         break;
     case ResourceGroupId::DelayLoad_GreenHouseGarden:
@@ -841,7 +829,6 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_STORE_MAINMENUBUTTONDOWN, owner_IMAGE_STORE_MAINMENUBUTTONDOWN);
         manager.ReleaseImage(Sexy::IMAGE_STORE_MAINMENUBUTTON, owner_IMAGE_STORE_MAINMENUBUTTON);
         manager.ReleaseImage(Sexy::IMAGE_STORE_SIGN, owner_IMAGE_STORE_SIGN);
-        manager.ReleaseImage(Sexy::IMAGE_STORE_HATCHBACKOPEN, owner_IMAGE_STORE_HATCHBACKOPEN);
         manager.ReleaseImage(Sexy::IMAGE_STORE_CARCLOSED_NIGHT, owner_IMAGE_STORE_CARCLOSED_NIGHT);
         manager.ReleaseImage(Sexy::IMAGE_STORE_CARCLOSED, owner_IMAGE_STORE_CARCLOSED);
         manager.ReleaseImage(Sexy::IMAGE_STORE_CAR_NIGHT, owner_IMAGE_STORE_CAR_NIGHT);
@@ -873,7 +860,6 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_ZOMBIE_NOTE_HELP, owner_IMAGE_ZOMBIE_NOTE_HELP);
         break;
     case ResourceGroupId::DelayLoad_Zombiquarium:
-        manager.ReleaseImage(Sexy::IMAGE_WAVESIDE, owner_IMAGE_WAVESIDE);
         manager.ReleaseImage(Sexy::IMAGE_WAVECENTER, owner_IMAGE_WAVECENTER);
         manager.ReleaseImage(Sexy::IMAGE_AQUARIUM1, owner_IMAGE_AQUARIUM1);
         break;
@@ -913,14 +899,13 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         break;
     case ResourceGroupId::LoadingImages:
         manager.ReleaseImage(Sexy::IMAGE_REANIM_STINKY_TURN3, owner_IMAGE_REANIM_STINKY_TURN3);
-        manager.ReleaseImage(Sexy::IMAGE_REANIM_TREE_BG, owner_IMAGE_REANIM_TREE_BG);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS, owner_IMAGE_REANIM_SELECTORSCREEN_WOODSIGN3_PRESS);
-        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_HIGHLIGHT);
-        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_VASEBREAKER_BUTTON);
-        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_HIGHLIGHT);
-        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_CHALLENGES_BUTTON);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_HIGHLIGHT);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_SURVIVAL_BUTTON);
+        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_PUZZLE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_PUZZLE_HIGHLIGHT);
+        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_PUZZLE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_PUZZLE_BUTTON);
+        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_HIGHLIGHT);
+        manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_MINIGAMES_BUTTON);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_HIGHLIGHT);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON, owner_IMAGE_REANIM_SELECTORSCREEN_STARTADVENTURE_BUTTON);
         manager.ReleaseImage(Sexy::IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT, owner_IMAGE_REANIM_SELECTORSCREEN_ADVENTURE_HIGHLIGHT);
@@ -944,18 +929,12 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_ZOMBIE_BOBSLED1, owner_IMAGE_ZOMBIE_BOBSLED1);
         manager.ReleaseImage(Sexy::IMAGE_ICETRAP2, owner_IMAGE_ICETRAP2);
         manager.ReleaseImage(Sexy::IMAGE_ICETRAP, owner_IMAGE_ICETRAP);
-        manager.ReleaseImage(Sexy::IMAGE_IMITATERSEEDDISABLED, owner_IMAGE_IMITATERSEEDDISABLED);
-        manager.ReleaseImage(Sexy::IMAGE_IMITATERSEED, owner_IMAGE_IMITATERSEED);
         manager.ReleaseImage(Sexy::IMAGE_ICE_CAP, owner_IMAGE_ICE_CAP);
         manager.ReleaseImage(Sexy::IMAGE_ICE, owner_IMAGE_ICE);
         manager.ReleaseImage(Sexy::IMAGE_WALLNUT_BOWLINGSTRIPE, owner_IMAGE_WALLNUT_BOWLINGSTRIPE);
         manager.ReleaseImage(Sexy::IMAGE_PLANTSHADOW2, owner_IMAGE_PLANTSHADOW2);
         manager.ReleaseImage(Sexy::IMAGE_PLANTSHADOW, owner_IMAGE_PLANTSHADOW);
         manager.ReleaseImage(Sexy::IMAGE_POOL_CAUSTIC_EFFECT, owner_IMAGE_POOL_CAUSTIC_EFFECT);
-        manager.ReleaseImage(Sexy::IMAGE_POOL_SHADING_NIGHT, owner_IMAGE_POOL_SHADING_NIGHT);
-        manager.ReleaseImage(Sexy::IMAGE_POOL_SHADING, owner_IMAGE_POOL_SHADING);
-        manager.ReleaseImage(Sexy::IMAGE_POOL_BASE_NIGHT, owner_IMAGE_POOL_BASE_NIGHT);
-        manager.ReleaseImage(Sexy::IMAGE_POOL_BASE, owner_IMAGE_POOL_BASE);
         manager.ReleaseImage(Sexy::IMAGE_POOL, owner_IMAGE_POOL);
         manager.ReleaseImage(Sexy::IMAGE_COINBANK, owner_IMAGE_COINBANK);
         manager.ReleaseImage(Sexy::IMAGE_SUNBANK, owner_IMAGE_SUNBANK);
@@ -964,7 +943,6 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_CONVEYORBELT_BACKDROP, owner_IMAGE_CONVEYORBELT_BACKDROP);
         manager.ReleaseImage(Sexy::IMAGE_SEEDBANK, owner_IMAGE_SEEDBANK);
         manager.ReleaseImage(Sexy::IMAGE_WHITEWATER_SHADOW, owner_IMAGE_WHITEWATER_SHADOW);
-        manager.ReleaseImage(Sexy::IMAGE_ZEN_NEED_ICONS, owner_IMAGE_ZEN_NEED_ICONS);
         manager.ReleaseImage(Sexy::IMAGE_TREEFOOD, owner_IMAGE_TREEFOOD);
         manager.ReleaseImage(Sexy::IMAGE_WATERDROP, owner_IMAGE_WATERDROP);
         manager.ReleaseImage(Sexy::IMAGE_PLANTSPEECHBUBBLE, owner_IMAGE_PLANTSPEECHBUBBLE);
@@ -1020,7 +998,6 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_OPTIONS_MENUBACK, owner_IMAGE_OPTIONS_MENUBACK);
         manager.ReleaseImage(Sexy::IMAGE_OPTIONS_CHECKBOX1, owner_IMAGE_OPTIONS_CHECKBOX1);
         manager.ReleaseImage(Sexy::IMAGE_OPTIONS_CHECKBOX0, owner_IMAGE_OPTIONS_CHECKBOX0);
-        manager.ReleaseImage(Sexy::IMAGE_OPTIONS_BACKTOGAMEBUTTON2, owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON2);
         manager.ReleaseImage(Sexy::IMAGE_OPTIONS_BACKTOGAMEBUTTON0, owner_IMAGE_OPTIONS_BACKTOGAMEBUTTON0);
         manager.ReleaseImage(Sexy::IMAGE_CHOCOLATE, owner_IMAGE_CHOCOLATE);
         manager.ReleaseImage(Sexy::IMAGE_MONEYBAG_HI_RES, owner_IMAGE_MONEYBAG_HI_RES);
@@ -1034,7 +1011,6 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseImage(Sexy::IMAGE_ZOMBIE_NOTE_SMALL, owner_IMAGE_ZOMBIE_NOTE_SMALL);
         manager.ReleaseImage(Sexy::IMAGE_MINIGAME_TROPHY, owner_IMAGE_MINIGAME_TROPHY);
         manager.ReleaseImage(Sexy::IMAGE_TROPHY_HI_RES, owner_IMAGE_TROPHY_HI_RES);
-        manager.ReleaseImage(Sexy::IMAGE_TROPHY, owner_IMAGE_TROPHY);
         manager.ReleaseImage(Sexy::IMAGE_FLAGMETERPARTS, owner_IMAGE_FLAGMETERPARTS);
         manager.ReleaseImage(Sexy::IMAGE_FLAGMETERLEVELPROGRESS, owner_IMAGE_FLAGMETERLEVELPROGRESS);
         manager.ReleaseImage(Sexy::IMAGE_FLAGMETER, owner_IMAGE_FLAGMETER);
@@ -1208,6 +1184,9 @@ void ReleaseGroup(Sexy::ResourceManager& manager, ResourceGroupId group)
         manager.ReleaseSound(Sexy::SOUND_BLEEP);
         manager.ReleaseSound(Sexy::SOUND_AWOOGA);
         manager.ReleaseSound(Sexy::SOUND_ACHIEVEMENT);
+        break;
+    case ResourceGroupId::DelayLoad_TreeOfWisdom:
+        manager.ReleaseImage(Sexy::IMAGE_BACKGROUND_TREEOFWISDOM, owner_IMAGE_BACKGROUND_TREEOFWISDOM);
         break;
     default: break;
     }

@@ -65,9 +65,14 @@ target_include_directories(pvz-perf PRIVATE "${CMAKE_CURRENT_LIST_DIR}" "${CMAKE
 # Do not expose all host-vcpkg headers (zlib/jpeg have a different target ABI).
 file(COPY "${PVZ_JSON_INCLUDE}/nlohmann" DESTINATION "${CMAKE_BINARY_DIR}/include")
 target_compile_definitions(pvz-perf PRIVATE NDEBUG ${WEB_GPU_DEFINITION} SEXY_WINDOW_BROWSER=1 SEXY_RENDER_GPU=1 SPNG_STATIC SEXY_DISABLE_MODVAL=1 AL_APIENTRY=)
-target_compile_options(pvz-perf PRIVATE -Oz -flto -fexceptions -sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_LIBJPEG=1
+# Keep wasm32 + WebGL as the scalar compatibility fallback.
+set(PVZ_WEB_SIMD_FLAGS)
+if(PVZ_WEB_MEMORY64 OR PVZ_WEB_BACKEND STREQUAL "WEBGPU")
+    set(PVZ_WEB_SIMD_FLAGS -msimd128)
+endif()
+target_compile_options(pvz-perf PRIVATE -Oz -flto ${PVZ_WEB_SIMD_FLAGS} -fexceptions -sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_LIBJPEG=1
     -Wno-inconsistent-missing-override -Wno-invalid-source-encoding -Wno-invalid-offsetof)
-target_link_options(pvz-perf PRIVATE -Oz -flto -fexceptions -sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_LIBJPEG=1
+target_link_options(pvz-perf PRIVATE -Oz -flto ${PVZ_WEB_SIMD_FLAGS} -fexceptions -sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_LIBJPEG=1
     --emit-symbol-map
     -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
     -sSTACK_SIZE=4194304 -sASYNCIFY=1 -sASYNCIFY_STACK_SIZE=131072 -sEXIT_RUNTIME=0
@@ -76,10 +81,6 @@ target_link_options(pvz-perf PRIVATE -Oz -flto -fexceptions -sUSE_SDL=2 -sUSE_ZL
 # --preload-file is a linker argument, not an inferred Ninja input.
 # Rebuild the data archive whenever the resource package changes.
 set_property(TARGET pvz-perf APPEND PROPERTY LINK_DEPENDS "${PVZ_WEB_PAK}")
-# Adopt the launcher-validated canvas context instead of requesting another EGL context.
-if(PVZ_WEB_BACKEND STREQUAL "WEBGL")
-    target_link_options(pvz-perf PRIVATE -sGL_PREINITIALIZED_CONTEXT=1)
-endif()
 if(PVZ_WEB_MEMORY64)
     target_compile_options(pvz-perf PRIVATE -sMEMORY64=1)
     target_link_options(pvz-perf PRIVATE -sMEMORY64=1)

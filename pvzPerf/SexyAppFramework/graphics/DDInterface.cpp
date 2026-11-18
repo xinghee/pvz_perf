@@ -249,8 +249,13 @@ int DDInterface::ResizePreparedPresent()
     if (!mRenderInterface->ResizePresent(width,height)) return RESULT_DEFERRED;
     auto viewport = GameViewport::Fit(width,height);
     if(mApp->mLandscapeUIActive && viewport.width<890)viewport=GameViewport::Fit(890,600);
+#if defined(__ANDROID__)
+    mRenderInterface->ResizeScene(viewport.width, viewport.height);
+#endif
     if (viewport.width != mWidth || viewport.height != mHeight) {
+#if !defined(__ANDROID__)
         mRenderInterface->ResizeScene(viewport.width, viewport.height);
+#endif
         mWidth = viewport.width;
         mHeight = viewport.height;
         mAspect = Ratio(mWidth, mHeight);
@@ -258,14 +263,7 @@ int DDInterface::ResizePreparedPresent()
         mScreenImage->mHeight = mHeight;
         // Scale chains borrow the main canvas. Rebuild only after its fence and
         // only on an aspect change; resident game images never need host pixels.
-        if (mApp->mModernScalePrepared) {
-            mApp->mModernScalePrepared = false;
-            mApp->PrepareScalePipelineObjects();
-            auto& renderer = *mRenderInterface->mRenderer;
-            renderer.WarmScale(false);
-            renderer.WarmScale(true);
-            renderer.SetScaleMode(mApp->IsScalePresentActive(), !mIsWindowed);
-        }
+
     }
     mDisplayWidth=width; mDisplayHeight=height;
     mPresentationRect=Rect(0,0,width,height);

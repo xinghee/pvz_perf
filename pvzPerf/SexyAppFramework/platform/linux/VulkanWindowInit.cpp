@@ -38,10 +38,6 @@ void SexyAppBase::MakeWindow()
     VulkanInitConfig init{};
     init.appInfo.pApplicationName = "pvz_perf";
     init.enableValidation = std::getenv("PVZ_VULKAN_VALIDATION") != nullptr;
-    if (!mScaleEffects.empty()) {
-        init.features.shaderStorageImageExtendedFormats = VK_TRUE;
-        init.features.shaderImageGatherExtended = VK_TRUE;
-    }
     VkSwapchainCreateInfoKHR swapchain{
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .imageFormat = VK_FORMAT_B8G8R8A8_UNORM,
@@ -54,25 +50,9 @@ void SexyAppBase::MakeWindow()
         .clipped = VK_TRUE
     };
 #if defined(__ANDROID__)
-#if defined(PVZ_ANDROID_HDR_TEST)
-    mScaleHDREnabled=true;
-    mScaleHDRPaperWhite=80.0f;
-    mScaleHDRMaxNits=420.0f;
-    mScaleHDRReinhardPaperNits=150.0f;
-    mScaleHDRStrength=1.0f;
-    init.extraExtensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
-    swapchain.imageFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
-    swapchain.imageColorSpace=VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT;
-#else
-    // Android HDR calibration is not ready for the v3.3 release.
     mScaleHDREnabled = false;
 #endif
-#endif
     mGpuContext = std::make_unique<GpuContext>(init, mHWnd, swapchain);
-#if defined(PVZ_ANDROID_HDR_TEST)
-    __android_log_print(ANDROID_LOG_INFO,"pvz_hdr_test","swapchain format=%u colorSpace=%u; paper=80 peak=420 nits",
-        unsigned(mGpuContext->swapchainFormat),unsigned(mGpuContext->swapchainColorSpace));
-#endif
     mUseExternalHWND = false;
     mExternalHWND = nullptr;
     mIsPhysWindowed = true;

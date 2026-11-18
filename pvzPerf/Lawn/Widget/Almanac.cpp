@@ -19,6 +19,7 @@
 #include "widget/WidgetManager.h"
 #include "Sexy.TodLib/generated/SceneAtlasData.h"
 #include "graphics/AtlasDraw.h"
+#include <array>
 
 static bool gZombieDefeated[NUM_ZOMBIE_TYPES] = { false };
 
@@ -38,45 +39,61 @@ void RefreshAlmanacLayout(AlmanacDialog& theDialog)
 	theDialog.mMouseInsets.mRight = std::min(0, theDialog.mX + theDialog.mWidth - aRight);
 }
 
-void DrawAlmanacBackground(Graphics* g, const TextureSource& texture,
-    AlmanacSprite sprite, const Rect& bounds, int originX)
+void DrawAlmanacBackground(Graphics* g, const TextureSource& theTexture,
+	const Rect& theBounds, int theOriginX, AlmanacSprite theFrame,
+	AlmanacSprite theDecoration, int theDecorationX, AlmanacSprite theHeader,
+	int theHeaderX, int theHeaderY)
 {
-    constexpr int artWidth=1400,artHeight=600,border=16;
-    const int left=bounds.mX-originX,paper=bounds.mWidth-2*border;
-    Graphics background(*g);background.ClipRect(left,bounds.mY,bounds.mWidth,bounds.mHeight);
-    const auto drawLayer=[&](AlmanacSprite layer) {
-        const auto index=static_cast<unsigned>(layer);
-        const auto& crop=AlmanacAtlas::Crops[index];
-        const auto& image=AlmanacAtlas::Images[index];
-        const auto slice=[&](Rect source,int dx) {
-            const int x=std::max(source.mX,crop.mX),y=std::max(source.mY,crop.mY);
-            const int right=std::min(source.mX+source.mWidth,crop.mX+crop.mWidth);
-            const int bottom=std::min(source.mY+source.mHeight,crop.mY+crop.mHeight);
-            if(right<=x||bottom<=y)return;
-            DrawAtlasImage(&background,texture,image,
-                Rect(dx+x-source.mX,y-source.mY,right-x,bottom-y),
-                Rect(x-crop.mX,y-crop.mY,right-x,bottom-y));
-        };
-        slice(Rect(0,0,border,artHeight),left);
-        slice(Rect((artWidth-BOARD_WIDTH)/2+left+border,0,paper,artHeight),left+border);
-        slice(Rect(artWidth-border,0,border,artHeight),left+bounds.mWidth-border);
-    };
-    drawLayer(AlmanacSprite::ALMANAC_COMMON_BACK);
-    drawLayer(sprite);
+	const int aLeft = theBounds.mX - theOriginX;
+	Graphics aBackground(*g);
+	aBackground.ClipRect(aLeft, theBounds.mY, theBounds.mWidth, theBounds.mHeight);
+	// Replanted uses a Simple, stretch-anchored paper Image, a separate Sliced
+	// outline with FillCenter=false, and independently anchored decorations.
+	// Never slice a composition containing the paper: its gradient and artwork
+	// have different colours at the displaced source columns, producing seams.
+	const auto& aPaper = AlmanacAtlas::Images[static_cast<unsigned>(AlmanacSprite::ALMANAC_PAPER)];
+	DrawAtlasImage(&aBackground, theTexture, aPaper,
+		Rect(aLeft, 0, theBounds.mWidth, theBounds.mHeight),
+		Rect(0, 0, aPaper.mWidth, aPaper.mHeight));
+	const auto& aDecoration = AlmanacAtlas::Images[static_cast<unsigned>(theDecoration)];
+	DrawAtlasImage(&aBackground, theTexture, aDecoration,
+		Rect(theDecorationX, 0, aDecoration.mWidth, aDecoration.mHeight),
+		Rect(0, 0, aDecoration.mWidth, aDecoration.mHeight));
+
+	constexpr int b = 64;
+	const int dx = aLeft + theBounds.mWidth - b, dy = theBounds.mHeight - b;
+	const std::array<Rect, 8> aDestinations{{
+		{aLeft,0,b,b}, {aLeft+b,0,dx-aLeft-b,b}, {dx,0,b,b},
+		{aLeft,b,b,dy-b}, {dx,b,b,dy-b},
+		{aLeft,dy,b,b}, {aLeft+b,dy,dx-aLeft-b,b}, {dx,dy,b,b}
+	}};
+	// Eight consecutive entries contain exactly the old sampled border strips.
+	// The unused transparent centre no longer occupies atlas pixels. Draw count
+	// and destination geometry remain unchanged.
+	for (unsigned int i = 0; i < aDestinations.size(); ++i)
+	{
+		const auto& aPiece = AlmanacAtlas::Images[static_cast<unsigned>(theFrame) + i];
+		DrawAtlasImage(&aBackground, theTexture, aPiece, aDestinations[i],
+			Rect(1, 1, aPiece.mWidth - 2, aPiece.mHeight - 2));
+	}
+	const auto& aHeader = AlmanacAtlas::Images[static_cast<unsigned>(theHeader)];
+	DrawAtlasImage(&aBackground, theTexture, aHeader,
+		Rect(theHeaderX, theHeaderY, aHeader.mWidth, aHeader.mHeight),
+		Rect(0, 0, aHeader.mWidth, aHeader.mHeight));
 }
 
 } // namespace
+
+static Rect AlmanacGroundSourceRect(int map)
+{
+    return Rect(map == 4 ? 764 : 595, map == 4 ? 301 : map == 2 || map == 3 ? 270 : 145, 200, 200);
+}
 
 // Draw directly from resident maps. No duplicate 200x200 ground textures.
 void DrawAlmanacGround(Graphics* g,int x,int y,int map,bool ice) {
     const std::array<Image*,5> maps{IMAGE_BACKGROUND1,IMAGE_BACKGROUND2,IMAGE_BACKGROUND3,IMAGE_BACKGROUND4,IMAGE_BACKGROUND5};
     Graphics ground(*g);ground.ClipRect(x,y,200,200);
-    ground.DrawImage(maps[map],x,y,Rect(map==4?764:595,map==4?301:map==2||map==3?270:145,200,200));
-    // Pool maps contain a white opening, not a baked water surface. Reuse the
-    // resident base underneath the animated layers, in the same map coordinates.
-    if (map == 2 || map == 3)
-        ground.DrawImage(map == 3 ? IMAGE_POOL_BASE_NIGHT : IMAGE_POOL_BASE,
-            x + BOARD_OFFSET + 35 - 595, y + 279 - 270);
+    ground.DrawImage(maps[map],x,y,AlmanacGroundSourceRect(map));
     if(ice){ground.DrawImage(IMAGE_ICE_CAP,x+120,y+125);ground.DrawImage(IMAGE_ICE,x+135,y+125);}
 }
 
@@ -370,8 +387,9 @@ void AlmanacDialog::DrawIndex(Graphics* g)
 {
 	const auto visualNowNs = mApp->mEffectSystem->mReanimationHolder->mVisualTimeNs;
 	const TextureSource aTexture{AlmanacAtlas::Texture, 0};
-	DrawAlmanacBackground(g,aTexture,AlmanacSprite::ALMANAC_INDEXBACK,
-		mApp->mScreenBounds,mX);
+	DrawAlmanacBackground(g, aTexture, mApp->mScreenBounds, mX,
+		AlmanacSprite::ALMANAC_INDEXBACK, AlmanacSprite::ALMANAC_INDEXPANELS, 0,
+		AlmanacSprite::ALMANAC_INDEXHEADER, 100, 15);
 	Graphics aContentGraphics(*g);
 	aContentGraphics.ClipRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 	g = &aContentGraphics;
@@ -387,6 +405,8 @@ void AlmanacDialog::DrawIndex(Graphics* g)
 	{
 		Graphics aZombieGraphics = Graphics(*g);
 		mZombie->BeginDraw(&aZombieGraphics);
+		Graphics aShadowGraphics(aZombieGraphics);
+		mZombie->DrawShadow(&aShadowGraphics);
 		mZombie->Draw(visualNowNs, &aZombieGraphics);
 	}
 }
@@ -396,8 +416,9 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 {
 	const auto visualNowNs = mApp->mEffectSystem->mReanimationHolder->mVisualTimeNs;
 	const TextureSource aTexture{AlmanacAtlas::Texture, 0};
-	DrawAlmanacBackground(g,aTexture,AlmanacSprite::ALMANAC_PLANTBACK,
-		mApp->mScreenBounds,mX);
+	DrawAlmanacBackground(g, aTexture, mApp->mScreenBounds, mX,
+		AlmanacSprite::ALMANAC_PLANTBACK, AlmanacSprite::ALMANAC_PLANTDECOR,
+		mApp->mScreenBounds.mX - mX, AlmanacSprite::ALMANAC_PLANTHEADER, 59, 12);
 	Graphics aContentGraphics(*g);
 	aContentGraphics.ClipRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 	g = &aContentGraphics;
@@ -433,8 +454,10 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 
 		Graphics aPoolGraphics(*g);
 		aPoolGraphics.ClipRect(521, 107, 200, 200);
-		// Match the crop used by DrawAlmanacGround, including background padding.
-		aPoolGraphics.Translate(521 - (595 - BOARD_OFFSET), 107 - 270);
+        // PoolEffect uses board coordinates (background origin -220,0).
+        // Apply exactly the same source-to-destination transform as the map crop.
+        const Rect aSource = AlmanacGroundSourceRect(aNight ? 3 : 2);
+        aPoolGraphics.Translate(521 + 220 - aSource.mX, 107 - aSource.mY);
 		mApp->mPoolEffect->PoolEffectDraw(&aPoolGraphics, aNight);
 	}
 	else
@@ -582,8 +605,9 @@ void AlmanacDialog::DrawZombies(Graphics* g)
 {
 	const auto visualNowNs = mApp->mEffectSystem->mReanimationHolder->mVisualTimeNs;
 	const TextureSource aTexture{AlmanacAtlas::Texture, 0};
-	DrawAlmanacBackground(g,aTexture,AlmanacSprite::ALMANAC_ZOMBIEBACK,
-		mApp->mScreenBounds,mX);
+	DrawAlmanacBackground(g, aTexture, mApp->mScreenBounds, mX,
+		AlmanacSprite::ALMANAC_ZOMBIEBACK, AlmanacSprite::ALMANAC_ZOMBIEDECOR,
+		mApp->mScreenBounds.mX - mX, AlmanacSprite::ALMANAC_ZOMBIEHEADER, 32, 17);
 	Graphics aContentGraphics(*g);
 	aContentGraphics.ClipRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 	g = &aContentGraphics;

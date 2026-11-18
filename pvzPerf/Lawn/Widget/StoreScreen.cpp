@@ -192,7 +192,7 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
     mPrevButton->mDownImage = Sexy::IMAGE_STORE_PREVBUTTONHIGHLIGHT;
     mPrevButton->mColors[ButtonWidget::COLOR_LABEL] = Color(255, 240, 0);
     mPrevButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(200, 200, 255);
-    mPrevButton->Resize(252, 402, aPrevImage->mWidth, aPrevImage->mHeight);
+    mPrevButton->Resize(246, 398, aPrevImage->mWidth, aPrevImage->mHeight);
 
     mNextButton = new NewLawnButton(nullptr, StoreScreen::StoreScreen_Next, this);
     mNextButton->mDoFinger = true;
@@ -203,7 +203,7 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
     mNextButton->mDownImage = Sexy::IMAGE_STORE_NEXTBUTTONHIGHLIGHT;
     mNextButton->mColors[ButtonWidget::COLOR_LABEL] = Color(255, 240, 0);
     mNextButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(200, 200, 255);
-    mNextButton->Resize(596, 402, aNextImage->mWidth, aNextImage->mHeight);
+    mNextButton->Resize(587, 396, aNextImage->mWidth, aNextImage->mHeight);
 
     mOverlayWidget = new StoreScreenOverlay(this);
     mOverlayWidget->Resize(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
@@ -461,7 +461,7 @@ void StoreScreen::DrawItemIcon(Graphics* g, int theItemPosition, StoreItem theIt
     { nullptr, 0, 0, false },                                   // 5 STORE_ITEM_PLANT_GOLD_MAGNET（种子包默认支）
     { nullptr, 0, 0, false },                                   // 6 STORE_ITEM_PLANT_SPIKEROCK（种子包默认支）
     { nullptr, 0, 0, false },                                   // 7 STORE_ITEM_PLANT_COBCANNON（种子包默认支）
-    { &Sexy::IMAGE_IMITATERSEED, 0, 0, false },                 // 8 STORE_ITEM_PLANT_IMITATER
+    { nullptr, 0, 0, false },                                   // 8 STORE_ITEM_PLANT_IMITATER（复用底板与预览缓存）
     { nullptr, 0, 0, false },                                   // 9 STORE_ITEM_BONUS_LAWN_MOWER（种子包默认支）
     { nullptr, 0, 0, false },                                   // 10 STORE_ITEM_POTTED_MARIGOLD_1（表外 IsPottedPlant 支）
     { nullptr, 0, 0, false },                                   // 11 STORE_ITEM_POTTED_MARIGOLD_2（表外 IsPottedPlant 支）
@@ -488,10 +488,10 @@ void StoreScreen::DrawItemIcon(Graphics* g, int theItemPosition, StoreItem theIt
     (int)StoreItem::STORE_ITEM_FIRSTAID + 1, "kStoreIconDrawRows 槽位须与 StoreItem 枚举同步");
     static_assert(kStoreIconDrawRows[(int)StoreItem::STORE_ITEM_POOL_CLEANER].mImage == &Sexy::IMAGE_ICON_POOLCLEANER &&
     kStoreIconDrawRows[(int)StoreItem::STORE_ITEM_WHEEL_BARROW].mImage == &Sexy::IMAGE_ZEN_WHEELBARROW &&
-    kStoreIconDrawRows[(int)StoreItem::STORE_ITEM_PLANT_IMITATER].mImage == &Sexy::IMAGE_IMITATERSEED &&
+    kStoreIconDrawRows[(int)StoreItem::STORE_ITEM_PLANT_IMITATER].mImage == nullptr &&
     kStoreIconDrawRows[(int)StoreItem::STORE_ITEM_PACKET_UPGRADE].mImage == nullptr &&
     kStoreIconDrawRows[(int)StoreItem::STORE_ITEM_PLANT_GATLINGPEA].mImage == nullptr,
-    "kStoreIconDrawRows 关键槽位锚定（POOL_CLEANER/WHEEL_BARROW/IMITATER 有图，PACKET_UPGRADE/GATLINGPEA 默认）");
+    "kStoreIconDrawRows 关键槽位锚定（POOL_CLEANER/WHEEL_BARROW 有图，IMITATER/PACKET_UPGRADE/GATLINGPEA 默认）");
 
     if (theIsForHighlight)
     {
@@ -611,26 +611,15 @@ void StoreScreen::Draw(Graphics* g)
             (BOARD_WIDTH - Sexy::IMAGE_STORE_BACKGROUND->mWidth) / 2, 0);
     }
 
-    // Foreground extensions keep their authored left edges; centering each
-    // layer separately would move the shelves away from their item hit boxes.
-    if (!mHatchTimer && mHatchOpen)
-    {
-        g->DrawImage(Sexy::IMAGE_STORE_CAR, mShakeX + 196, mShakeY + 138);
-        g->DrawImage(Sexy::IMAGE_STORE_HATCHBACKOPEN, mShakeX + 299, mShakeY);
-        if (mApp->IsNight())
-        {
-            g->DrawImage(Sexy::IMAGE_STORE_CAR_NIGHT, mShakeX + 688, mShakeY + 193);
-        }
-    }
-    else
-    {
-        g->DrawImage(Sexy::IMAGE_STORE_CARCLOSED, mShakeX + 196, mShakeY + 138);
-        if (mApp->IsNight())
-        {
-            g->DrawImage(Sexy::IMAGE_STORE_CAR_NIGHT, mShakeX + 688, mShakeY + 193);
-            g->DrawImage(Sexy::IMAGE_STORE_CARCLOSED_NIGHT, mShakeX + 337, mShakeY + 187);
-        }
-    }
+    // HD car and its paired hatch are registered and composed offline from the
+    // same Replanted UI layout. Each state shares the (196, 0) origin; the shop
+    // background, sign, item coordinates and purchase hit boxes remain separate.
+    // Night is a complete paired state, not an overlay cropped from the old car.
+    const bool night = mApp->IsNight();
+    Image* car = (!mHatchTimer && mHatchOpen)
+        ? (night ? Sexy::IMAGE_STORE_CAR_NIGHT : Sexy::IMAGE_STORE_CAR)
+        : (night ? Sexy::IMAGE_STORE_CARCLOSED_NIGHT : Sexy::IMAGE_STORE_CARCLOSED);
+    g->DrawImage(car, mShakeX + 196, mShakeY);
     g->DrawImage(Sexy::IMAGE_STORE_SIGN, 285, aStoreSignPosY);
 
     Graphics gCrazyDave = Graphics(*g);

@@ -14,6 +14,7 @@ namespace Sexy {
 struct GLTexture {
     unsigned int image = 0, framebuffer = 0;
     int width = 0, height = 0;
+    int drawingWidth=0, drawingHeight=0, pixelScale=1;
     unsigned int format = 0;
     unsigned int slot = ~0U, staticSlot = ~0U, flags = 0;
     unsigned int sampler = 0; // Actual GL texture filter/wrap state; GL 3.0 has no core sampler objects.
@@ -58,7 +59,7 @@ struct GLRenderer::Impl {
     const bool frameSync;
     unsigned int sceneProgram = 0, spriteProgram = 0, mixedSpriteProgram = 0, imageProgram = 0, fontProgram = 0, presentProgram = 0;
     unsigned int poolProgram = 0, poolVao = 0, poolVertices = 0, poolIndices = 0;
-    std::array<int, 11> poolUniforms{};
+    std::array<int, 12> poolUniforms{};
     UniformLocations sceneUniforms{}, spriteUniforms{}, mixedSpriteUniforms{}, imageUniforms{}, fontUniforms{}, presentUniforms{};
     bool open = false, mainFrame = false, initialized = false, sceneInitialized = false;
     GLTexture* white = nullptr;

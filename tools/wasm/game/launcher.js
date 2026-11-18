@@ -9,8 +9,9 @@ const musicVolume=document.getElementById('music-volume'),launchFullscreen=docum
 const saveToolsReady=import('./save-tools.js'),lineupToolsReady=import('./lineups.js');
 const progressToolsReady=import('./progress-storage.js');
 const lineupStorageReady=import('./lineup-storage.js');
+const localStorageReady=import('./local-save-storage.js');
 const startupToolsReady=import('./startup.js');
-let progressStorage,lineupStorage,cloudUploads=0;
+let progressStorage,lineupStorage,localSaveStorage,cloudUploads=0;
 let diagnostics;
 const diagnosticsReady=import('./diagnostics.js').then(({createDiagnostics})=>{
  diagnostics=createDiagnostics({storage:localStorage,defaultEnabled:window.PVZWebConfig?.diagnosticsDefault===true,
@@ -21,6 +22,7 @@ const diagnosticsReady=import('./diagnostics.js').then(({createDiagnostics})=>{
     visibilityState:document.visibilityState,focused:document.hasFocus(),
     wallTimeMs:Date.now(),monotonicMs:performance.now(),
     wasmBytes:Module?.pvzMemory?.buffer.byteLength??null,
+    persistentStorage:localSaveStorage?.persistent??null,
     // Optional Chromium heap metric, not portable and not process RSS.
     jsHeapBytes:performance.memory?.usedJSHeapSize??null,
     loaded:!!Module?._pvz_web_loading_complete?.(),draws:Module?._pvz_web_draws?.(),updates:Module?._pvz_web_updates?.(),scene:Module?._pvz_web_scene?.(),
@@ -55,7 +57,7 @@ document.getElementById('diagnostics-download').onclick=async()=>{
  if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file]});return}catch(error){if(error.name==='AbortError')return}}
  const url=URL.createObjectURL(file),link=document.createElement('a');link.href=url;link.download=file.name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
 };
-window.addEventListener('pagehide',event=>diagnostics?.pagehide(JSON.stringify({persisted:event.persisted,trusted:event.isTrusted})));
+window.addEventListener('pagehide',event=>{diagnostics?.pagehide(JSON.stringify({persisted:event.persisted,trusted:event.isTrusted}));localSaveStorage?.flush().catch(()=>{})});
 window.addEventListener('pageshow',event=>{
  diagnostics?.lifecycle('pageshow',JSON.stringify({persisted:event.persisted,trusted:event.isTrusted}));
  if(running&&!document.hidden){Module._pvz_web_focus?.(1);Module.pvzMusic?.resumeIfInterrupted()}
@@ -64,7 +66,11 @@ for(const type of ['freeze','resume'])document.addEventListener(type,event=>diag
 function cloudUploadState(active){cloudUploads+=active?1:-1;document.getElementById('cloud-upload-warning').hidden=cloudUploads===0}
 function lineupStatus(message){document.getElementById('lineup-cloud-status').textContent=message}
 function saveLineups(){lineupStorage.save().catch(error=>lineupStatus('阵型库云同步未完成：'+error.message+'；本地阵型已保留'))}
-for(const button of document.querySelectorAll('#cloud-restore-dialog button'))button.onclick=()=>document.getElementById('cloud-restore-dialog').close(button.value);
+async function synchronizeProgress(){
+ const results=await Promise.allSettled([progressStorage.save(true),lineupStorage.save(true)]);
+ for(let i=0;i<results.length;i++)if(results[i].status==='rejected')document.getElementById(i?'lineup-cloud-status':'cloud-status').textContent='自动同步暂未完成，继续使用本地存档：'+results[i].reason.message;
+}
+
 const mobileUA=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const mobileInput=mobileUA||
  (navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1)||matchMedia('(pointer:coarse)').matches;
@@ -202,7 +208,7 @@ for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])canv
 canvas.addEventListener('lostpointercapture',e=>cancelPointer(e.pointerId));
 window.addEventListener('blur',event=>{diagnostics?.lifecycle('blur',JSON.stringify({trusted:event.isTrusted}));cancelPointers();Module._pvz_web_focus?.(0)});
 window.addEventListener('focus',event=>{diagnostics?.lifecycle('focus',JSON.stringify({trusted:event.isTrusted}));if(!document.hidden){Module._pvz_web_focus?.(1);if(running)Module.pvzMusic?.resumeIfInterrupted()}});
-document.addEventListener('visibilitychange',event=>{diagnostics?.lifecycle('visibilitychange',JSON.stringify({trusted:event.isTrusted}));if(document.hidden)cancelPointers();else if(running)Module.pvzMusic?.resumeIfInterrupted();Module._pvz_web_focus?.(document.hidden?0:1)});
+document.addEventListener('visibilitychange',event=>{diagnostics?.lifecycle('visibilitychange',JSON.stringify({trusted:event.isTrusted}));if(document.hidden){cancelPointers();localSaveStorage?.flush().catch(()=>{})}else if(running)Module.pvzMusic?.resumeIfInterrupted();Module._pvz_web_focus?.(document.hidden?0:1)});
 window.addEventListener('keydown',()=>{if(running)Module.pvzMusic?.resumeIfInterrupted()});
 for(const type of ['mousedown','mousemove','mouseup','touchstart','touchmove','touchend','touchcancel'])
  canvas.addEventListener(type,e=>{if(running){e.preventDefault();e.stopImmediatePropagation()}},{capture:true,passive:false});
@@ -220,7 +226,7 @@ async function saveSettings(p){
  Module.pvzLandscapeActive=settings.landscapeUI;
  Module.FS.writeFile(saveRoot+'/settings.json',JSON.stringify(settings,null,2)+'\n');
  try{localStorage.setItem(storageKey,JSON.stringify(p))}catch{}
- await new Promise((resolve,reject)=>Module.FS.syncfs(false,error=>error?reject(error):resolve()));
+ await localSaveStorage.flush();
 }
 function clearUserSaves(){
  const fs=Module.FS;
@@ -235,7 +241,7 @@ async function installBaseline(){
  for(const [name,bytes] of Object.entries(files))Module.FS.writeFile(saveRoot+'/'+name,bytes);
  await syncSaves();
 }
-function syncSaves(){return new Promise((resolve,reject)=>Module.FS.syncfs(false,error=>error?reject(error):resolve())).then(()=>{document.getElementById('save-local').hidden=true;document.getElementById('local-save-status').textContent='本地存档已写入浏览器'},error=>{document.getElementById('save-local').hidden=false;document.getElementById('local-save-status').textContent='本地保存失败：'+error.message+'。请重试，不要刷新页面。';throw error})}
+function syncSaves(reconcile=false){return (reconcile?localSaveStorage.sync():localSaveStorage.flush()).then(()=>{document.getElementById('save-local').hidden=true;document.getElementById('local-save-status').textContent='本地存档已写入浏览器'},error=>{document.getElementById('save-local').hidden=false;document.getElementById('local-save-status').textContent='本地保存失败：'+error.message+'。请重试，不要刷新页面。';throw error})}
 // DFU runs in a standalone wasm32 worker before the game starts. Stage every
 // replacement before touching MEMFS, then persist once. It never calls the game.
 async function fixLocalLevelSaves(){
@@ -258,10 +264,13 @@ async function fixLocalLevelSaves(){
  if(replacements.length)await syncSaves();
 }
 async function preparePersistentFiles(){
- await new Promise((resolve,reject)=>Module.FS.syncfs(true,error=>error?reject(error):resolve()));
+ const {LocalSaveStorage}=await localStorageReady;
+ localSaveStorage=new LocalSaveStorage(Module.FS,{legacyFileSystem:Module.IDBFS,report:message=>{document.getElementById('save-local').hidden=false;document.getElementById('local-save-status').textContent=message}});
+ await localSaveStorage.prepare();
  Module.FS.mkdirTree(saveRoot);
  const {ProgressStorage}=await progressToolsReady;
  progressStorage=new ProgressStorage(Module.FS,saveRoot,{cloudEnabled:!webConfig.bypassBilibiliChecks,
+  sharedStorageId:webConfig.sharedStorageId,canApplyRemote:()=>!running,onRestore:()=>syncSaves(),
   provideToy:async()=>(await import('./rewards.js')).provideBilibiliToy(),
   report:message=>{document.getElementById('cloud-status').textContent=message},
   uploadState:cloudUploadState});
@@ -312,21 +321,8 @@ async function progressAction(operation){
  try{await operation()}catch(error){document.getElementById('cloud-status').textContent=error.message}
  finally{rewardBusy=false;start.disabled=false}
 }
-document.getElementById('upload-progress').onclick=()=>progressAction(async()=>{
- const results=await Promise.allSettled([progressStorage.save(true),lineupStorage.save(true)]);
- const errors=results.filter(r=>r.status==='rejected').map(r=>r.reason.message);if(errors.length)throw Error(errors.join('；'));
-});
-document.getElementById('restore-progress').onclick=()=>progressAction(async()=>{
- await Promise.allSettled([progressStorage.saving,lineupStorage.saving]);
- const [saved,lineups]=await Promise.all([progressStorage.readCloud(),lineupStorage.readCloud()]);if(!saved&&!lineups)throw Error('当前 B 站账号尚无云端进度或阵型库');
- const dialog=document.getElementById('cloud-restore-dialog');
- const confirmed=new Promise(resolve=>{dialog.addEventListener('close',()=>resolve(dialog.returnValue==='restore'),{once:true});dialog.returnValue='cancel';dialog.showModal()});
- if(!await confirmed)return;
- if(saved){progressStorage.apply(saved.files);progressStorage.needsChoice=false;await syncSaves();await progressStorage.save()}
- if(lineups){lineupStorage.library.replace(lineups.value);lineupStorage.needsChoice=false;lineupStatus('阵型库已从云端恢复')}
-});
 document.getElementById('save-local').onclick=()=>progressAction(async()=>{
- await syncSaves();document.getElementById('local-save-status').textContent='本地存档已写入浏览器';
+ await syncSaves(true);document.getElementById('local-save-status').textContent='本地存档已写入浏览器';
 });
 let startupPhase='页面初始化',startupMonitor=null;
 function setStartupPhase(phase){startupPhase=phase;startupMonitor?.setPhase(phase);diagnostics?.record('phase',phase)}
@@ -341,16 +337,16 @@ async function returnToSettings(){
  document.getElementById('game-fps').hidden=true;
  Module.pvzTextInput.hide();cancelPointers();
  try{await syncSaves();document.getElementById('local-save-status').textContent='本地存档已写入浏览器'}catch(error){document.getElementById('local-save-status').textContent='本地保存失败：'+error.message+'。请重试保存或导出 DAT64，不要刷新页面。'}
- progressStorage?.save().catch(error=>{document.getElementById('cloud-status').textContent='进度备份未完成：'+error.message});
- if(lineupStorage)saveLineups();
  if(document.fullscreenElement)await document.exitFullscreen().catch(console.warn);
  running=false;document.body.classList.remove('playing','portrait-game');stage.classList.remove('running');
+ await synchronizeProgress();
+
  document.documentElement.classList.remove('playing');window.scrollTo(0,0);
  for(const input of form.elements)input.disabled=false;
  formEdited=false;fillPreferences({...readPreferences(),...loadNativeSettings()});
  document.getElementById('graphics-backend').disabled=document.getElementById('graphics-backend').options.length<2;
  document.getElementById('memory-model').disabled=document.getElementById('memory-model').options.length<2;
- document.getElementById('upload-progress').disabled=document.getElementById('restore-progress').disabled=webConfig.bypassBilibiliChecks;
+
  statusText.textContent='准备就绪';startupPhase='设置页面';start.disabled=false;scheduleResize();
 }
 canvas.addEventListener('webglcontextcreationerror',event=>{Module.pvzWebGLCreationError=event.statusMessage||'浏览器未提供创建失败的详情'});
@@ -361,14 +357,15 @@ var Module={canvas,locateFile:name=>'./'+name,pvzRefreshRate:60,pvzMobileInput:m
  pvzOnQuit:()=>returnToSettings().catch(showError),
  print:message=>console.log(message),printErr:message=>console.error(message),onAbort:showError,pvzOnError:showError,
  monitorRunDependencies:left=>{statusText.textContent=left?'正在准备资源与存档…':'加载完成';startupPhase=statusText.textContent},
- preRun:[function(){Module.FS.mkdir('/persist');Module.FS.mount(Module.IDBFS,{autoPersist:false},'/persist');Module.addRunDependency('savedata');preparePersistentFiles().catch(error=>{Module.pvzStorageError=true;showError('存档准备失败，未清除原有存档：'+error.message)}).finally(()=>Module.removeRunDependency('savedata'))}],
- onRuntimeInitialized:()=>{runtimeReady=!Module.pvzStorageError;if(!formEdited)fillPreferences({...readPreferences(),...loadNativeSettings()});document.getElementById('progress').hidden=true;statusText.textContent='准备就绪';start.disabled=!runtimeReady||!Module.pvzMusic;document.getElementById('upload-progress').disabled=document.getElementById('restore-progress').disabled=webConfig.bypassBilibiliChecks||!runtimeReady;scheduleResize()}
+ preRun:[function(){Module.FS.mkdir('/persist');Module.addRunDependency('savedata');preparePersistentFiles().catch(error=>{Module.pvzStorageError=true;showError('存档准备失败，未清除原有存档：'+error.message)}).finally(()=>Module.removeRunDependency('savedata'))}],
+ onRuntimeInitialized:()=>{runtimeReady=!Module.pvzStorageError;if(!formEdited)fillPreferences({...readPreferences(),...loadNativeSettings()});document.getElementById('progress').hidden=true;statusText.textContent='准备就绪';start.disabled=!runtimeReady||!Module.pvzMusic;scheduleResize()}
 };
 fillPreferences(readPreferences());
 form.addEventListener('input',()=>{formEdited=true;updateControls()});form.addEventListener('change',()=>{formEdited=true;updateControls()});
 new ResizeObserver(scheduleResize).observe(stage);
 form.addEventListener('submit',async event=>{
  event.preventDefault();if(!runtimeReady||running||rewardBusy)return;
+ localSaveStorage.requestPersistence().then(persistent=>diagnostics?.record('persistent-storage',JSON.stringify({granted:persistent})));
  const p=preferences();fps.value=p.targetFps;start.disabled=true;
  if(p.unlockAllLevels&&!unlockAuthorized){
   // Unlock WebAudio inside this gesture even if the account check awaits I/O.
@@ -381,6 +378,7 @@ form.addEventListener('submit',async event=>{
   const audio=Module.pvzMusic.unlock();
   await startupDeadline(Promise.all([audio,textInputReady,full]),'初始化音频与输入');
   document.documentElement.classList.add('playing');document.body.classList.add('playing');window.scrollTo(0,0);fitCanvas();
+  await synchronizeProgress();
   await startupDeadline(saveSettings(p),'保存启动设置');
   try{await fixLocalLevelSaves()}finally{(await saveToolsReady).releaseSaveTools()}
   running=true;lastWidth=Module.pvzViewport.width;stage.classList.add('running');
@@ -403,8 +401,9 @@ form.addEventListener('submit',async event=>{
 window.addEventListener('error',event=>showError(event.error||event.message));window.addEventListener('unhandledrejection',event=>showError(event.reason));
 async function boot(){
  const config=window.PVZGraphicsConfig||{webgpu:false};
- const {supportsMemory64,memoryModels,selectMemoryModel,runtimeStem}=await import('./runtime-selection.js');
- const memorySupported=supportsMemory64(),models=memoryModels(config,memorySupported);
+ const {supportsMemory64,supportsSimd128,memoryModels,selectMemoryModel,runtimeStem,highResolutionLink}=await import('./runtime-selection.js');
+ const memorySupported=supportsMemory64(),simdSupported=supportsSimd128(),models=memoryModels(config,memorySupported,simdSupported);
+ Module.pvzSimdSupported=simdSupported;
  let savedMemory=null;try{savedMemory=localStorage.getItem('pvz_wasm_memory_override')}catch{}
  const memoryModel=selectMemoryModel(models,savedMemory);
  Module.pvzMemoryModel=memoryModel;
@@ -423,16 +422,23 @@ async function boot(){
  memoryDropdown.onchange=()=>switchRuntime('pvz_wasm_memory_override',memoryDropdown.value);
  document.getElementById('memory-info').textContent=models.length>1
   ?'已检测到 Memory64，默认优先 64 位；仍可手动选择 32 位。切换会重新加载，设置和存档共用。'
-  :!memorySupported?'当前浏览器不支持 Memory64，使用 32 位。':config.memory64?'此包仅包含 Memory64 诊断版本。':'此包仅包含 32 位版本。';
+  :config.simd128&&!simdSupported?'未检测到 SIMD128，使用 32 位 WebGL 2 兼容版本。':!memorySupported?'当前浏览器不支持 Memory64，使用 32 位。':config.memory64?'此包仅包含 Memory64 诊断版本。':'此包仅包含 32 位版本。';
  if(config.version){document.title='pvz_perf · 网页 v'+config.version;document.getElementById('web-version').textContent='网页 v'+config.version}
  const dropdown=document.getElementById('graphics-backend');
  document.getElementById('graphics-field').hidden=false;
  dropdown.replaceChildren(new Option('正在检测图形接口…',''));dropdown.disabled=true;
- const {detectGraphics,capabilityText,prepareWebGLContext}=await import('./graphics.js');
- const capabilities=await detectGraphics(navigator.gpu,{webgpu:config.webgpu,webgl:!config.webgpu||config.fallback,gameCanvas:canvas});
+ const {detectGraphics,capabilityText}=await import('./graphics.js');
+ const capabilities=await detectGraphics(navigator.gpu,{webgpu:config.webgpu&&(!config.simd128||simdSupported),webgl:!config.webgpu||config.fallback});
+ // Reuse the normal WebGPU probe. A WebGL-only distribution may probe HD
+ // separately without changing its available game runtimes or delaying startup.
+ if(highResolutionLink(webConfig,memorySupported,simdSupported,true)){
+  const showHD=report=>{const url=highResolutionLink(webConfig,memorySupported,simdSupported,report.webgpu);if(url){const link=document.getElementById('high-resolution');link.href=url;link.hidden=false}};
+  if(config.webgpu)showHD(capabilities);
+  else void detectGraphics(navigator.gpu,{webgpu:true,webgl:false}).then(showHD).catch(()=>{});
+ }
  document.getElementById('graphics-capabilities').textContent=capabilityText(capabilities);
  Module.pvzGraphicsCapabilities=capabilities;
- const available=[['webgpu','WebGPU'],['webgl','WebGL 2']].filter(([name])=>capabilities[name]);
+ const available=[['webgpu','WebGPU'],['webgl','WebGL 2']].filter(([name])=>capabilities[name]&&!(name==='webgpu'&&config.webgpuMemory64Only&&memoryModel!=='wasm64'));
  if(!available.length){
   dropdown.replaceChildren(new Option('无可用图形接口',''));
   throw Error(config.fallback?'当前浏览器的 WebGPU 和 WebGL 2 都无法运行本游戏。请查看下方检测结果，或换用其他浏览器。':'此包提供的图形接口无法运行本游戏。请查看下方检测结果。');
@@ -447,8 +453,6 @@ async function boot(){
  dropdown.value=available.length>1?mode:backend;dropdown.disabled=available.length<2;
  dropdown.onchange=()=>switchRuntime('pvz_graphics_backend',dropdown.value);
  document.getElementById('graphics-info').textContent='当前使用 '+(backend==='webgpu'?'WebGPU':'WebGL 2')+'；切换接口会重新加载设置页，存档保留。';
- // Reuse the validated browser context; SDL/EGL must not request another one.
- if(backend==='webgl')Module.preinitializedWebGLContext=prepareWebGLContext(canvas);
  Module.pvzSelectedBackend=backend;
  const stem=runtimeStem(config,backend,memoryModel);
  Module.pvzRuntimeStem=stem;
