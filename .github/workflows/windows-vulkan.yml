@@ -84,6 +84,9 @@ jobs:
           & "$env:VCPKG_DIR\bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Install Python build helpers
+        run: python -m pip install --quiet pillow
+
       - name: Configure (Windows x64 Vulkan)
         shell: pwsh
         run: |
