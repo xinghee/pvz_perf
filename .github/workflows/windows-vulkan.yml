@@ -11,6 +11,10 @@ on:
         description: 'Release tag (defaults to zh-preview)'
         type: string
         default: ''
+      exe_only:
+        description: 'Build the exe only: skip the HD 4x asset binding (no 4x corpus in this repo)'
+        type: boolean
+        default: false
   push:
     tags:
       - 'pc-*'
@@ -83,6 +87,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
           & "$env:VCPKG_DIR\bootstrap-vcpkg.bat" -disableMetrics
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Skip HD asset binding (exe-only build)
+        if: inputs.exe_only
+        shell: bash
+        run: |
+          for f in images.json fonts.json package-policy.json package4x-validation.json; do
+            p="assets/high-resolution/$f"
+            if [ -f "$p" ]; then mv "$p" "$p.off"; echo "moved $f"; fi
+          done
+          echo "HD binding disabled; the pak will be built from the 1x assets."
 
       - name: Install Python build helpers
         # CMake resolves Python3 itself (3.14 on this image), so install into that
