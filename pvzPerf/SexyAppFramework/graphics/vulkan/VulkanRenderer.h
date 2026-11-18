@@ -198,6 +198,16 @@ public:
     const int& sceneWidth;
     const int& sceneHeight;
     uint32_t MaxImageDimension2D() const;
+    // Enough information to size a post-process chain without pulling Vulkan
+    // types into the application layer.
+    struct ScaleDeviceProfile {
+        std::string name;
+        bool integrated = false;
+        bool discrete = false;
+        bool software = false;
+        std::uint64_t vramBytes = 0;
+    };
+    ScaleDeviceProfile DeviceProfile() const;
     struct ResourceCounts { size_t textures, retiredTextures, descriptorPools, vertexBuffers; };
     ResourceCounts GetResourceCounts() const;
     struct TextureUploadState {

@@ -1726,6 +1726,23 @@ uint32_t VulkanRenderer::MaxImageDimension2D() const {
     vkGetPhysicalDeviceProperties(impl_->window.physicalDevice,&properties);
     return properties.limits.maxImageDimension2D;
 }
+VulkanRenderer::ScaleDeviceProfile VulkanRenderer::DeviceProfile() const {
+    ScaleDeviceProfile profile;
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(impl_->window.physicalDevice,&properties);
+    profile.name=properties.deviceName;
+    profile.integrated=properties.deviceType==VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU;
+    profile.discrete=properties.deviceType==VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+    profile.software=properties.deviceType==VK_PHYSICAL_DEVICE_TYPE_CPU;
+    VkPhysicalDeviceMemoryProperties memory{};
+    vkGetPhysicalDeviceMemoryProperties(impl_->window.physicalDevice,&memory);
+    // An integrated GPU reports the shared system heap as device local, so this
+    // is only a coarse figure; the caller treats it as an upper bound.
+    for (uint32_t i=0;i<memory.memoryHeapCount;++i)
+        if (memory.memoryHeaps[i].flags&VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            profile.vramBytes=std::max<std::uint64_t>(profile.vramBytes,memory.memoryHeaps[i].size);
+    return profile;
+}
 VulkanRenderer::ResourceCounts VulkanRenderer::GetResourceCounts() const {
     const auto& s = *impl_;
     size_t streamCount = 0;

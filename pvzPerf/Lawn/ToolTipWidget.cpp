@@ -9,6 +9,10 @@
 
 using namespace Sexy;
 
+// 提示框字体：原版用 Pix118Bold(8px)/Pico129(9px)，拉丁字母在那个尺寸下是
+// 设计好的像素字，汉字却会糊成实心块（12px 才勉强可读）。这里换成 16px/12px，
+// 布局由 CalculateSize 自适应。
+
 ToolTipWidget::ToolTipWidget()
 {
 	mX = 0;
@@ -45,7 +49,7 @@ void ToolTipWidget::GetLines(std::vector<SexyString>& theLines)
 			const char32_t aChar = UTF8DecodeAt(mLabel, aIndexInLine, aCharBytes);
 			if (aChar == ' ' || aChar == '\n')
 				break;
-			aLineWidth += FONT_PICO129->CharWidth(aChar);
+			aLineWidth += FONT_BRIANNETOD12->CharWidth(aChar);
 			aIndexInLine += static_cast<unsigned int>(aCharBytes);
 			if (aForcedBreak == aNoBreak && aLineWidth >= mGetsLinesWidth)
 				aForcedBreak = aIndexInLine;
@@ -54,7 +58,7 @@ void ToolTipWidget::GetLines(std::vector<SexyString>& theLines)
 		if (aIndexInLine != mLabel.size() && aLineWidth < mGetsLinesWidth && mLabel[aIndexInLine] != '\n')
 		{
 			size_t aSpaceBytes = 1;
-			aLineWidth += FONT_PICO129->CharWidth(UTF8DecodeAt(mLabel, aIndexInLine, aSpaceBytes));
+			aLineWidth += FONT_BRIANNETOD12->CharWidth(UTF8DecodeAt(mLabel, aIndexInLine, aSpaceBytes));
 			aIndexInLine += static_cast<unsigned int>(aSpaceBytes);
 		}
 		else
@@ -86,8 +90,8 @@ void ToolTipWidget::GetLines(std::vector<SexyString>& theLines)
 void ToolTipWidget::CalculateSize()
 {
 	// C++23 第一批·条目7：行数组在此算好缓存（mLines），Draw 直接复用，不再每帧重建
-	int aTitleWidth = FONT_TINYBOLD->StringWidth(mTitle);
-	int aWarningWidth = FONT_PICO129->StringWidth(mWarningText);
+	int aTitleWidth = FONT_BRIANNETOD16->StringWidth(mTitle);
+	int aWarningWidth = FONT_BRIANNETOD12->StringWidth(mWarningText);
 	int aMaxWidth = std::max(aTitleWidth, aWarningWidth);
 
 	mGetsLinesWidth = std::max(aMaxWidth - 30, 100);
@@ -96,20 +100,20 @@ void ToolTipWidget::CalculateSize()
 
 	for (size_t i = 0; i < mLines.size(); i++)
 	{
-		int aLineWidth = FONT_PICO129->StringWidth(mLines[i]);
+		int aLineWidth = FONT_BRIANNETOD12->StringWidth(mLines[i]);
 		aMaxWidth = std::max(aMaxWidth, aLineWidth);
 	}
 
 	int aHeight = 6;
 	if (!mTitle.empty())
 	{
-		aHeight = FONT_TINYBOLD->mAscent + 8;
+		aHeight = FONT_BRIANNETOD16->mAscent + 8;
 	}
 	if (!mWarningText.empty())
 	{
-		aHeight += FONT_TINYBOLD->mAscent + 2;
+		aHeight += FONT_BRIANNETOD16->mAscent + 2;
 	}
-	aHeight += (int)mLines.size() * FONT_PICO129->mAscent;
+	aHeight += (int)mLines.size() * FONT_BRIANNETOD12->mAscent;
 
 	mWidth = aMaxWidth + 10;
 	mHeight = aHeight + (int)mLines.size() * 2 - 2;
@@ -168,16 +172,16 @@ void ToolTipWidget::DrawAt(Graphics* g, int aPosX, int aPosY)
 
 	if (!mTitle.empty())
 	{
-		g->mFont = FONT_TINYBOLD;
-		g->DrawString(mTitle, aPosX + (mWidth - FONT_TINYBOLD->StringWidth(mTitle)) / 2, aPosY + FONT_TINYBOLD->mAscent);
-		aPosY += FONT_TINYBOLD->mAscent + 2;
+		g->mFont = FONT_BRIANNETOD16;
+		g->DrawString(mTitle, aPosX + (mWidth - FONT_BRIANNETOD16->StringWidth(mTitle)) / 2, aPosY + FONT_BRIANNETOD16->mAscent);
+		aPosY += FONT_BRIANNETOD16->mAscent + 2;
 	}
 
 	if (!mWarningText.empty())
 	{
-		g->mFont = FONT_PICO129;
-		int x = aPosX + (mWidth - FONT_PICO129->StringWidth(mWarningText)) / 2;
-		int y = aPosY + FONT_PICO129->mAscent;
+		g->mFont = FONT_BRIANNETOD12;
+		int x = aPosX + (mWidth - FONT_BRIANNETOD12->StringWidth(mWarningText)) / 2;
+		int y = aPosY + FONT_BRIANNETOD12->mAscent;
 
 		Color aWarningColor(255, 0, 0);
 		if (mWarningFlashCounter > 0 && mWarningFlashCounter % 20 < 10)
@@ -189,15 +193,15 @@ void ToolTipWidget::DrawAt(Graphics* g, int aPosX, int aPosY)
 		g->DrawString(mWarningText, x, y);
 		g->mColor = Color::Black;
 
-		aPosY += FONT_PICO129->mAscent + 2;
+		aPosY += FONT_BRIANNETOD12->mAscent + 2;
 	}
 
 	// 条目7：直接复用 CalculateSize 缓存的行数组（不再每帧重建 vector + substr 分配）
-	g->mFont = FONT_PICO129;
+	g->mFont = FONT_BRIANNETOD12;
 	for (size_t i = 0; i < mLines.size(); i++)
 	{
 		const SexyString& aLine = mLines[i];  // 条目6：引用取代逐行值拷贝
-		g->DrawString(aLine, aPosX + (mWidth - FONT_PICO129->StringWidth(aLine)) / 2, aPosY + FONT_PICO129->mAscent);
-		aPosY += FONT_PICO129->mAscent + 2;
+		g->DrawString(aLine, aPosX + (mWidth - FONT_BRIANNETOD12->StringWidth(aLine)) / 2, aPosY + FONT_BRIANNETOD12->mAscent);
+		aPosY += FONT_BRIANNETOD12->mAscent + 2;
 	}
 }

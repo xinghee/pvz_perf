@@ -427,6 +427,9 @@ public:
 	};
 	ScalePipelineConfig					mScaleWindowConfig;
 	ScalePipelineConfig					mScaleFullscreenConfig;
+	// scale.json 的 autoTune（默认开）：按显示器分辨率与显卡类型决定堆几级
+	// Anime4K。配置里的 effects 仍被视为"模板"，只决定用哪些效果与参数。
+	bool								mScaleAutoTune = true;
 	// scale.json 顶级 HDR 对象：启用时交换链切 HDR10/PQ（运行时不可切换，
 	// 仅启动时应用一次；请求后若显示器/Windows/交换链不满足则立即失败）。
 	// 唯一暴露项 = strength（AutoHDRStrength 同义，默认 1）。亮度锚
@@ -675,6 +678,9 @@ public:
 	virtual bool			UpdateApp();
 		int						InitDDInterface();
 		void					LoadScaleConfig();
+		// 返回本次应保留的 Anime4K 级数（0..配置里的数量）。
+		int						SelectScaleAnime4KPasses(const ScalePipelineConfig& theConfig,
+									int theTargetW, int theTargetH) const;
 
 	void					ResolveHDRAutoParams();
 	void					CompileScaleEffects();

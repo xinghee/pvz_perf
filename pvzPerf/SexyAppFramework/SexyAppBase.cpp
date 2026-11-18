@@ -78,6 +78,7 @@ extern char** environ;
 #include "misc/Debug.h"
 #include "paklib/PakInterface.h"
 #include <string>
+#include <cstdio>
 
 #include "sound/DummyMusicInterface.h"
 
@@ -3788,6 +3789,53 @@ int SexyAppBase::InitDDInterface()
     return result;
 }
 
+// Picks how many Anime4K passes the machine can actually afford. The chain in
+// scale.json is a template: the first pass upscales 2x, so two of them mean a 4x
+// wide intermediate, which a Vega-class iGPU cannot run at 1080p.
+int SexyAppBase::SelectScaleAnime4KPasses(const ScalePipelineConfig& theConfig,
+    int theTargetW, int theTargetH) const
+{
+    int aConfigured = 0;
+    for (const ScaleEffectConfig& anEntry : theConfig.mEffects)
+        if (anEntry.mPath.find("Anime4K") != std::string::npos)
+            ++aConfigured;
+    if (aConfigured == 0 || theTargetW <= 0 || theTargetH <= 0)
+        return 0;
+
+    auto& renderer = *mDDInterface->mRenderInterface->mRenderer;
+    const int aLogicalW = std::max(1, int(renderer.sceneWidth));
+    const int aLogicalH = std::max(1, int(renderer.sceneHeight));
+
+    // Lowest count whose intermediate still covers the target, so the final
+    // scaler never has to invent detail.
+    const int aWanted = theTargetH * 19 / 20;
+    int aNeeded = 0;
+    while (aNeeded < 2 && (aLogicalH << aNeeded) < aWanted)
+        ++aNeeded;
+
+    const auto aProfile = renderer.DeviceProfile();
+    int anUpper = std::min(aConfigured, 2);
+    if (aProfile.software)
+        anUpper = 0;
+    else if (aProfile.integrated && theTargetH <= 1440)
+        anUpper = std::min(anUpper, 1);   // 2.5K 以内核显只保留一级
+
+    const long long aBudget = aProfile.discrete ? 12'000'000LL : 4'000'000LL;
+    while (anUpper > 0)
+    {
+        const long long anIntermediate =
+            static_cast<long long>(aLogicalW << anUpper) * static_cast<long long>(aLogicalH << anUpper);
+        if (anIntermediate <= aBudget)
+            break;
+        --anUpper;
+    }
+
+    int aPasses = std::min(std::max(aNeeded, 1), anUpper);
+    while (aPasses > 0 && (aLogicalW << aPasses) > int(renderer.MaxImageDimension2D()))
+        --aPasses;
+    return aPasses;
+}
+
 bool SexyAppBase::PrepareScalePipelineObjects()
 {
     auto& renderer=*mDDInterface->mRenderInterface->mRenderer;
@@ -3809,18 +3857,11 @@ bool SexyAppBase::PrepareScalePipelineObjects()
     std::vector<GpuScaleStep> steps;
     steps.reserve(std::max(mScaleWindowConfig.mEffects.size(),
         mScaleFullscreenConfig.mEffects.size()));
+    static std::string aLastChoice;
     for (bool fullscreen : {false,true}) {
         steps.clear();
         const ScalePipelineConfig& config = fullscreen ?
             mScaleFullscreenConfig : mScaleWindowConfig;
-        if (config.mDeclared) {
-            for (const ScaleEffectConfig& entry : config.mEffects) {
-                if (entry.mEffectSlot >= mScaleEffects.size())
-                    throw std::runtime_error("Cannot resolve complete scale pipeline");
-                steps.push_back({&mScaleEffects[entry.mEffectSlot],
-                    {entry.mScalingType, entry.mScaleX, entry.mScaleY}});
-            }
-        }
         int targetW = windowTargetW, targetH = windowTargetH;
         if (fullscreen) {
 #ifdef _WIN32
@@ -3831,6 +3872,42 @@ bool SexyAppBase::PrepareScalePipelineObjects()
 			targetH = mNativeWindow->Height;
 #endif
             mModernScaleTargetW=targetW; mModernScaleTargetH=targetH;
+        }
+        // autoTune: keep only as many Anime4K passes as this machine can run.
+        int aAllowedPasses = -1;
+        int aUsedPasses = 0;
+        if (config.mDeclared && mScaleAutoTune) {
+            aAllowedPasses = SelectScaleAnime4KPasses(config, targetW, targetH);
+            const auto profile = renderer.DeviceProfile();
+            char aChoice[256];
+            std::snprintf(aChoice, sizeof(aChoice),
+                "scale %-10s gpu=\"%s\"(%s) target=%dx%d logical=%dx%d anime4k=%d intermediate=%dx%d\n",
+                fullscreen ? "fullscreen" : "window", profile.name.c_str(),
+                profile.integrated ? "integrated" : profile.discrete ? "discrete" :
+                    profile.software ? "software" : "other",
+                targetW, targetH, int(renderer.sceneWidth), int(renderer.sceneHeight),
+                aAllowedPasses, int(renderer.sceneWidth) << std::max(aAllowedPasses,0),
+                int(renderer.sceneHeight) << std::max(aAllowedPasses,0));
+            if (aLastChoice != aChoice) {
+                aLastChoice = aChoice;
+                if (FILE* aLog = fopen(GetLogFilePath("scale.txt").c_str(), "a")) {
+                    std::fputs(aChoice, aLog);
+                    fclose(aLog);
+                }
+            }
+        }
+        if (config.mDeclared) {
+            for (const ScaleEffectConfig& entry : config.mEffects) {
+                if (aAllowedPasses >= 0 && entry.mPath.find("Anime4K") != std::string::npos) {
+                    if (aUsedPasses >= aAllowedPasses)
+                        continue;
+                    ++aUsedPasses;
+                }
+                if (entry.mEffectSlot >= mScaleEffects.size())
+                    throw std::runtime_error("Cannot resolve complete scale pipeline");
+                steps.push_back({&mScaleEffects[entry.mEffectSlot],
+                    {entry.mScalingType, entry.mScaleX, entry.mScaleY}});
+            }
         }
         renderer.PrepareScale(fullscreen,steps,uint32_t(targetW),uint32_t(targetH));
     }
@@ -4791,6 +4868,7 @@ void SexyAppBase::LoadScaleConfig()
 	mScaleWindowConfig.mOutputWidth = 0;
 	mScaleWindowConfig.mOutputHeight = 0;
 	mScaleWindowConfig.mDeclared = false;
+	mScaleAutoTune = true;
 	mScaleFullscreenConfig.mEffects.clear();
 	mScaleFullscreenConfig.mOutputWidth = 0;
 	mScaleFullscreenConfig.mOutputHeight = 0;
@@ -4804,6 +4882,7 @@ void SexyAppBase::LoadScaleConfig()
 			throw std::runtime_error("scale.json: " + aDoc.mError);
 		return; // no scale.json -> use defaults
 	}
+	mScaleAutoTune = aDoc.GetBool("autoTune", true);
 
 	// Decode protocol fields once; only numeric IDs/values survive in app state.
 #if (defined(PVZ_GPU_OPENGL) || defined(PVZ_GPU_WEBGL) || defined(PVZ_GPU_WEBGPU)) || defined(PVZ_GPU_D3D9) || (defined(__ANDROID__) && !defined(SEXY_SCALE_EFFECT_AUTHORING))
