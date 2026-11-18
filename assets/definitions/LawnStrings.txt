@@ -2440,7 +2440,7 @@
 返回游戏
 
 [RESTART_LEVEL]
-你确定想要重新开始这一关卡吗？
+重新开始本关？
 
 [ADVICE_ZEN_GARDEN_PICK_UP_WATER]
 点击并拾起喷壶！

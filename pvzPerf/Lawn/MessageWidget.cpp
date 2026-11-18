@@ -36,6 +36,20 @@ size_t Utf8CharCount(const char* theText)
 	return aCount;
 }
 
+bool ContainsCjk(const SexyString& theText)
+{
+	size_t anOffset = 0;
+	while (anOffset < theText.size())
+	{
+		size_t aBytes = 1;
+		const char32_t aChar = Sexy::UTF8DecodeAt(theText, anOffset, aBytes);
+		if (aChar >= 0x2E80)
+			return true;
+		anOffset += aBytes;
+	}
+	return false;
+}
+
 size_t CopyUtf8Prefix(char* theDestination, size_t theCapacity, const SexyString& theText)
 {
 	if (theCapacity == 0)
@@ -608,11 +622,23 @@ void MessageWidget::Draw(Graphics* g)
 			aOutlineColor = Color(0, 0, 0, 128);
 			const Rect& aBounds = mApp->mScreenBounds;
 			Rect aRect(aBounds.mX - mApp->mBoard->mX, aPosY, aBounds.mWidth, aRectHeight);
+			// 中文没有西文那样的下伸部，按字体行框（约 1.9 倍字号）排两行会显得空，
+			// 所以汉字文案用更紧的行距。
+			const int aLineSpacing = ContainsCjk(aLabelStr)
+				? std::max(1, static_cast<int>(aFont->GetLineSpacing() * 0.75f))
+				: 0;
+			// 译文可能比英文多折一行；先量出实际高度，带子按需撑开，
+			// 否则 TodDrawStringWrapped 的垂直居中会让文字上下都溢出。
+			const int aTextHeight = TodDrawStringWrappedHelper(g, aLabelStr, aRect, aFont, aColor,
+				DrawStringJustification::DS_ALIGN_CENTER_VERTICAL_MIDDLE, false, aLineSpacing);
+			if (aTextHeight + 4 > aRect.mHeight)
+				aRect.mHeight = aTextHeight + 4;
 			g->mColor = aOutlineColor;
 			g->FillRect(aRect);
 
 			aRect.mY += aTextOffsetY;
-			TodDrawStringWrapped(g, aLabelStr, aRect, aFont, aColor, DrawStringJustification::DS_ALIGN_CENTER_VERTICAL_MIDDLE);
+			TodDrawStringWrapped(g, aLabelStr, aRect, aFont, aColor,
+				DrawStringJustification::DS_ALIGN_CENTER_VERTICAL_MIDDLE, aLineSpacing);
 		}
 		else
 		{
