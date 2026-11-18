@@ -19,6 +19,8 @@
 #include <cmath>
 #include <fstream>
 #include <stdexcept>
+#include <string_view>
+#include <vector>
 #include <utility>
 
 using namespace Sexy;
@@ -66,8 +68,8 @@ constexpr unsigned int TouchCancelAll = 0x40000000u;
 bool TouchPromotedMouse() {
     return (static_cast<ULONG_PTR>(GetMessageExtraInfo()) & 0xFFFFFF80u) == 0xFF515780u;
 }
-constexpr char MainWindowClass[] = "pvz_perf";
-constexpr char HiddenWindowClass[] = "pvz_perf_hidden";
+constexpr char MainWindowClass[] = "pvz_perf_hd";
+constexpr char HiddenWindowClass[] = "pvz_perf_hd_hidden";
 [[noreturn]] void WindowFailure(const char* operation) {
     throw std::runtime_error(std::string(operation)+" failed: "+std::to_string(GetLastError()));
 }
@@ -76,18 +78,8 @@ RECT ClientRect(HWND window) {
     if(!GetClientRect(window,&rect)) WindowFailure("GetClientRect");
     return rect;
 }
-WindowTrackLimits WindowClientLimits(const SexyAppBase& app) {
-    int height=600;
-    if(app.mModernScalePrepared && app.IsScalePresentActiveForMode(true) &&
-        app.mDDInterface && app.mDDInterface->mRenderInterface &&
-        app.mDDInterface->mRenderInterface->mRenderer) {
-        const auto output=app.mDDInterface->mRenderInterface->mRenderer->ScaleOutput(false);
-        if(output.height>0) height=int(output.height);
-    }
-    auto limits=WindowTrackLimits::FromScaleOutputHeight(app.mLandscapeUI?std::max(600,height):height);
-    if(app.mLandscapeUI)limits.minimumWidth=int((890LL*limits.height+300)/600);
-    return limits;
-}
+constexpr int MinClientWidth=800, MinClientHeight=600;
+constexpr int MaxClientWidth=5600, MaxClientHeight=2400;
 Point LogicalMouse(SexyAppBase& app,double x,double y) {
     int sx=0,sy=0;
     app.MapWindowMouse(x,y,sx,sy);
@@ -117,7 +109,7 @@ void SexyAppBase::MapWindowMouse(double x,double y,int& sx,int& sy) const {
 void SexyAppBase::MakeWindow() {
     if(mHWnd || mGpuContext) throw std::logic_error("Game window already exists");
     if constexpr (!NativeWindowsWindowApi::HdrOutput) mScaleHDREnabled=false;
-    mTitle="pvz_perf";
+    mTitle="pvz_perf HD";
     const DWORD style=WS_OVERLAPPED|WS_CAPTION|WS_SYSMENU|WS_MINIMIZEBOX|
         WS_THICKFRAME;
     const DWORD exStyle=WS_EX_APPWINDOW;
@@ -135,6 +127,17 @@ void SexyAppBase::MakeWindow() {
         mPreferredX<0?CW_USEDEFAULT:mPreferredX,mPreferredY<0?CW_USEDEFAULT:mPreferredY,
         bounds.right-bounds.left,bounds.bottom-bounds.top,nullptr,nullptr,gHInstance,this);
     if(!mHWnd) WindowFailure("CreateWindowEx");
+#if defined(PVZ_GPU_VULKAN) || defined(PVZ_GPU_D3D12)
+    if (mScaleHDREnabled) {
+        try {
+            mScaleHDREnabled = QueryVulkanHdrDisplay(TargetMonitor()).hdr;
+        } catch (const std::runtime_error& error) {
+            OutputDebugStringA(error.what());
+            mScaleHDREnabled = false;
+        }
+    }
+#endif
+
 #if defined(PVZ_GPU_D3D9)
     mScaleHDREnabled=false;
     mGpuContext=std::make_unique<GpuContext>(mHWnd,false,false);
@@ -147,14 +150,11 @@ void SexyAppBase::MakeWindow() {
         getenv("PVZ_VULKAN_VALIDATION")!=nullptr,mScaleHDREnabled);
 #else
     VulkanInitConfig init{};
-    init.appInfo.pApplicationName="pvz_perf";
+    init.appInfo.pApplicationName="pvz_perf HD";
     init.enableValidation=getenv("PVZ_VULKAN_VALIDATION")!=nullptr;
     // 不再要求 shaderFloat64：字体内核已是纯整数实现，fp64 是 NVIDIA 有而
     // Intel 消费卡（Arc 核显）没有的特性，曾被此行全灭候选卡。
-    if(!mScaleEffects.empty()) {
-        init.features.shaderStorageImageExtendedFormats=VK_TRUE;
-        init.features.shaderImageGatherExtended=VK_TRUE;
-    }
+
     VkSwapchainCreateInfoKHR swapchain{
         .sType=VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .imageFormat=VK_FORMAT_B8G8R8A8_UNORM,
@@ -164,6 +164,19 @@ void SexyAppBase::MakeWindow() {
         .presentMode=VK_PRESENT_MODE_MAILBOX_KHR,
         .clipped=VK_TRUE
     };
+    if (mScaleHDREnabled) {
+        uint32_t count = 0;
+        mScaleHDREnabled = false;
+        if (vkEnumerateInstanceExtensionProperties(nullptr, &count, nullptr) == VK_SUCCESS) {
+            std::vector<VkExtensionProperties> extensions(count);
+            if (vkEnumerateInstanceExtensionProperties(nullptr, &count, extensions.data()) == VK_SUCCESS)
+                mScaleHDREnabled = std::any_of(extensions.begin(), extensions.begin()+count,
+                    [](const auto& extension) {
+                        return std::string_view(extension.extensionName) ==
+                            VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME;
+                    });
+        }
+    }
     if(mScaleHDREnabled) {
         init.extraExtensions.push_back(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
         swapchain.imageFormat=VK_FORMAT_R16G16B16A16_SFLOAT;
@@ -268,14 +281,11 @@ DEVMODEW SexyAppBase::TargetVideoMode() const {
 void SexyAppBase::ResizeWindowClient(int width,int height) {
     if(width<=0 || height<=0) throw std::invalid_argument("Invalid window client size");
     if(mNativeFullscreen) throw std::logic_error("Cannot resize a fullscreen client as a window");
-    const auto limits=WindowClientLimits(*this);
-    // WarmScalePipelinesBeforeShow resizes the hidden window a second time.
-    // Keep the chosen monitor ratio while applying its prepared output height.
-    if(!mNativeWindowShown)
-        width=WindowStartupSize::FromMonitor(
-            nativeStartupViewport.width,nativeStartupViewport.height,limits.height).width;
-    width=limits.ConstrainWidth(width);
-    height=limits.height;
+    width=std::clamp(mWindowClientWidth>0 ? mWindowClientWidth :
+        WindowStartupSize::FromMonitor(nativeStartupViewport.width,nativeStartupViewport.height,1200).width,
+        MinClientWidth,MaxClientWidth);
+    height=std::clamp(mWindowClientHeight>0 ? mWindowClientHeight : 1200,
+        MinClientHeight,MaxClientHeight);
     RECT rect{0,0,width,height};
     const auto style=DWORD(GetWindowLongPtrW(mHWnd,GWL_STYLE));
     const auto exStyle=DWORD(GetWindowLongPtrW(mHWnd,GWL_EXSTYLE));
@@ -320,21 +330,7 @@ void SexyAppBase::UpdateHdrDisplay() {
     }
 }
 
-void SexyAppBase::PrepareFullscreenScaleForMonitor() {
-    if(!mModernScalePrepared) return;
-    const auto mode=TargetVideoMode();
-    if(int(mode.dmPelsWidth)==mModernScaleTargetW && int(mode.dmPelsHeight)==mModernScaleTargetH) return;
-    std::vector<ScaleEffectRuntimeDesc*> effects;
-    std::vector<ScaleEffectScaling> scaling;
-    if(mScaleFullscreenConfig.mDeclared && !BuildScalePipelineForMode(false,effects,scaling))
-        throw std::runtime_error("Cannot resolve resident fullscreen pipeline");
-    std::vector<GpuScaleStep> steps;
-    for(size_t i=0;i<effects.size();++i) steps.push_back({effects[i],scaling[i]});
-    auto& renderer=*mDDInterface->mRenderInterface->mRenderer;
-    renderer.PrepareScale(true,steps,mode.dmPelsWidth,mode.dmPelsHeight);
-    renderer.WarmScale(true);
-    mModernScaleTargetW=int(mode.dmPelsWidth);mModernScaleTargetH=int(mode.dmPelsHeight);
-}
+
 
 void SexyAppBase::UpdateMonitorState() {
     if(mSwitchingScreenMode) return;
@@ -349,8 +345,6 @@ void SexyAppBase::UpdateMonitorState() {
         if(!SetWindowPos(mHWnd,nullptr,rect.left,rect.top,rect.right-rect.left,
             rect.bottom-rect.top,SWP_NOZORDER|SWP_NOACTIVATE)) WindowFailure("SetWindowPos");
     }
-    PrepareFullscreenScaleForMonitor();
-    render.mRenderer->SetScaleMode(IsScalePresentActive(),!mIsWindowed);
     UpdateWindowGeometry();
     mNativeTopologyPending=false;
     mWidgetManager->MarkAllDirty();
@@ -359,6 +353,11 @@ void SexyAppBase::UpdateMonitorState() {
 
 void SexyAppBase::UpdateWindowGeometry() {
     mNativeResizePending=true;
+    if(!mNativeFullscreen && mNativeWindowShown && !mPhysMinimized) {
+        const auto client=ClientRect(mHWnd);
+        mWindowClientWidth=int(client.right-client.left);
+        mWindowClientHeight=int(client.bottom-client.top);
+    }
     auto& render=*mDDInterface->mRenderInterface;
     if(render.mSceneBegun) render.Flush();
     const int prepared=mDDInterface->PrepareScreenMode(mHWnd,mIsWindowed);
@@ -386,14 +385,10 @@ void SexyAppBase::SwitchScreenMode(bool windowed,bool force) {
     auto& render=*mDDInterface->mRenderInterface;
     render.Flush();
     auto& renderer=*render.mRenderer;
-    if(!windowed) PrepareFullscreenScaleForMonitor();
     SetWindowFullscreen(!windowed);
     if(windowed) {
-        const auto scaled=renderer.ScaleOutput(false);
-        ResizeWindowClient(IsScalePresentActiveForMode(true)?int(scaled.width):renderer.sceneWidth,
-            IsScalePresentActiveForMode(true)?int(scaled.height):renderer.sceneHeight);
+        ResizeWindowClient(renderer.sceneWidth,renderer.sceneHeight);
     }
-    renderer.SetScaleMode(IsScalePresentActiveForMode(windowed),!windowed);
     mIsWindowed=windowed;mIsPhysWindowed=true;
     UpdateWindowGeometry();
     UpdateHdrDisplay();
@@ -975,32 +970,33 @@ LRESULT CALLBACK SexyAppBase::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 		(GetWindowLongPtrW(hWnd, GWL_STYLE) & WS_THICKFRAME) &&
 		(hWnd == aSexyApp->mHWnd || !aSexyApp->mHWnd))
 	{
-		const auto limits = WindowClientLimits(*aSexyApp);
 		RECT border{};
 		if (!NativeWindowsWindowApi::AdjustClientRect(border,
 			DWORD(GetWindowLongPtrW(hWnd, GWL_STYLE)),
 			DWORD(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)), hWnd))
 			WindowFailure("AdjustClientRect");
 		const int borderWidth = border.right - border.left;
-		const int windowHeight = limits.height + border.bottom - border.top;
 		if (uMsg == WM_GETMINMAXINFO)
 		{
 			auto& info = *reinterpret_cast<MINMAXINFO*>(lParam);
-			info.ptMinTrackSize = {limits.minimumWidth + borderWidth, windowHeight};
-			info.ptMaxTrackSize = {limits.maximumWidth + borderWidth, windowHeight};
-			return 0;
-		}
-		auto& rect = *reinterpret_cast<RECT*>(lParam);
-		const int width = limits.ConstrainWidth(
-			int(rect.right - rect.left) - borderWidth) + borderWidth;
+            info.ptMinTrackSize = {MinClientWidth+borderWidth,MinClientHeight+border.bottom-border.top};
+            info.ptMaxTrackSize = {MaxClientWidth+borderWidth,MaxClientHeight+border.bottom-border.top};
+            return 0;
+        }
+        auto& rect = *reinterpret_cast<RECT*>(lParam);
+        const int borderHeight = border.bottom - border.top;
+        const int width = std::clamp(int(rect.right-rect.left)-borderWidth,
+            MinClientWidth,MaxClientWidth)+borderWidth;
+        const int resizedWindowHeight = std::clamp(int(rect.bottom-rect.top)-borderHeight,
+            MinClientHeight,MaxClientHeight)+borderHeight;
 		if (wParam == WMSZ_LEFT || wParam == WMSZ_TOPLEFT || wParam == WMSZ_BOTTOMLEFT)
 			rect.left = rect.right - width;
 		else
 			rect.right = rect.left + width;
 		if (wParam == WMSZ_TOP || wParam == WMSZ_TOPLEFT || wParam == WMSZ_TOPRIGHT)
-			rect.top = rect.bottom - windowHeight;
+			rect.top = rect.bottom - resizedWindowHeight;
 		else
-			rect.bottom = rect.top + windowHeight;
+			rect.bottom = rect.top + resizedWindowHeight;
 		return TRUE;
 	}
 	if (!aSexyApp->mNativeWindowReady)
@@ -1103,8 +1099,8 @@ LRESULT CALLBACK SexyAppBase::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 		{
 			const auto& rect = *reinterpret_cast<const RECT*>(lParam);
 			const auto client = ClientRect(hWnd);
-			const auto limits = WindowClientLimits(*aSexyApp);
-			RECT bounds{0, 0, limits.ConstrainWidth(client.right), limits.height};
+			RECT bounds{0, 0, std::clamp(int(client.right),MinClientWidth,MaxClientWidth),
+                std::clamp(int(client.bottom),MinClientHeight,MaxClientHeight)};
 			if (!NativeWindowsWindowApi::AdjustClientRect(bounds,
 				DWORD(GetWindowLongPtrW(hWnd, GWL_STYLE)),
 				DWORD(GetWindowLongPtrW(hWnd, GWL_EXSTYLE)), hWnd))
@@ -1610,7 +1606,7 @@ void SexyAppBase::ProcessMessageNow(UINT uMsg, WPARAM wParam, LPARAM lParam, HWN
 			if (!mAltEnterDown)
 			{
 				mAltEnterDown = true;
-				RequestScreenMode(!mIsWindowed, mUseCustomScale);
+				RequestScreenMode(!mIsWindowed);
 			}
 			break;
 		}

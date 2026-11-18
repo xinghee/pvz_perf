@@ -22,7 +22,8 @@
             "tag": "Image",
             "attrs": {
               "id": "BLANK",
-              "path": "blank"
+              "path": "blank.png",
+              "noalpha": "true"
             },
             "children": []
           },
@@ -95,7 +96,8 @@
             "tag": "Image",
             "attrs": {
               "id": "PVZ_LOGO",
-              "path": "PvZ_Logo"
+              "path": "PvZ_Logo.png",
+              "noalpha": "true"
             },
             "children": []
           },
@@ -454,16 +456,16 @@
           {
             "tag": "Image",
             "attrs": {
-              "id": "DIALOG_BAKED_NORMAL",
-              "path": "dialog_baked_normal"
+              "id": "DIALOG_BAKED_TALL",
+              "path": "dialog_baked_tall"
             },
             "children": []
           },
           {
             "tag": "Image",
             "attrs": {
-              "id": "DIALOG_BAKED_TALL",
-              "path": "dialog_baked_tall"
+              "id": "DIALOG_BAKED_NORMAL",
+              "path": "dialog_baked_normal"
             },
             "children": []
           },
@@ -495,7 +497,7 @@
             "tag": "Image",
             "attrs": {
               "id": "BUTTON_DOWN_LEFT",
-              "path": "button_down_left"
+              "path": "button_left"
             },
             "children": []
           },
@@ -503,7 +505,7 @@
             "tag": "Image",
             "attrs": {
               "id": "BUTTON_DOWN_MIDDLE",
-              "path": "button_down_middle"
+              "path": "button_middle"
             },
             "children": []
           },
@@ -511,7 +513,7 @@
             "tag": "Image",
             "attrs": {
               "id": "BUTTON_DOWN_RIGHT",
-              "path": "button_down_right"
+              "path": "button_right"
             },
             "children": []
           },
@@ -779,7 +781,8 @@
             "tag": "Image",
             "attrs": {
               "id": "OPTIONS_MENUBACK",
-              "path": "options_menuback"
+              "path": "options_menuback.png",
+              "noalpha": "true"
             },
             "children": []
           },
@@ -1451,6 +1454,15 @@
             "attrs": {
               "id": "TREEFOOD",
               "path": "TreeFood"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "PACKET_PLANTS",
+              "path": "packet_plants",
+              "cols": "13"
             },
             "children": []
           },
@@ -3224,6 +3236,38 @@
           {
             "tag": "Image",
             "attrs": {
+              "id": "SELECTORSCREEN_MINIGAMES_BUTTON",
+              "path": "SelectorScreen_Minigames_button"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "SELECTORSCREEN_MINIGAMES_HIGHLIGHT",
+              "path": "SelectorScreen_Minigames_Highlight"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "SELECTORSCREEN_PUZZLE_BUTTON",
+              "path": "SelectorScreen_Puzzle_button"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "SELECTORSCREEN_PUZZLE_HIGHLIGHT",
+              "path": "SelectorScreen_Puzzle_Highlight"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
               "id": "SELECTORSCREEN_SURVIVAL_BUTTON",
               "path": "SelectorScreen_Survival_button"
             },
@@ -3234,38 +3278,6 @@
             "attrs": {
               "id": "SELECTORSCREEN_SURVIVAL_HIGHLIGHT",
               "path": "SelectorScreen_Survival_Highlight"
-            },
-            "children": []
-          },
-          {
-            "tag": "Image",
-            "attrs": {
-              "id": "SELECTORSCREEN_CHALLENGES_BUTTON",
-              "path": "SelectorScreen_Challenges_button"
-            },
-            "children": []
-          },
-          {
-            "tag": "Image",
-            "attrs": {
-              "id": "SELECTORSCREEN_CHALLENGES_HIGHLIGHT",
-              "path": "SelectorScreen_Challenges_Highlight"
-            },
-            "children": []
-          },
-          {
-            "tag": "Image",
-            "attrs": {
-              "id": "SELECTORSCREEN_VASEBREAKER_BUTTON",
-              "path": "SelectorScreen_Vasebreaker_button"
-            },
-            "children": []
-          },
-          {
-            "tag": "Image",
-            "attrs": {
-              "id": "SELECTORSCREEN_VASEBREAKER_HIGHLIGHT",
-              "path": "SelectorScreen_Vasebreaker_Highlight"
             },
             "children": []
           },
@@ -4943,8 +4955,9 @@
             "tag": "Image",
             "attrs": {
               "id": "FOG",
-              "path": "fog",
-              "cols": "8"
+              "path": "fog.png",
+              "cols": "8",
+              "noalpha": "true"
             },
             "children": []
           },
@@ -5151,8 +5164,17 @@
           {
             "tag": "SetDefaults",
             "attrs": {
-              "path": "images",
+              "path": "reanim",
               "idprefix": "IMAGE_"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "BACKGROUND_TREEOFWISDOM",
+              "path": "tree_bg",
+              "a8r8g8b8": ""
             },
             "children": []
           }
@@ -5175,8 +5197,17 @@
           {
             "tag": "Image",
             "attrs": {
-              "id": "AWARDSCREEN_BACK",
-              "path": "AwardScreen_Back",
+              "id": "AWARDSCREEN_PANEL",
+              "path": "AwardScreen_Panel",
+              "a8r8g8b8": ""
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "AWARDSCREEN_FRAME",
+              "path": "AwardScreen_Frame",
               "a8r8g8b8": ""
             },
             "children": []
@@ -5348,6 +5379,54 @@
           {
             "tag": "Image",
             "attrs": {
+              "id": "ALMANAC_GROUNDDAY",
+              "path": "Almanac_GroundDay"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_GROUNDNIGHT",
+              "path": "Almanac_GroundNight"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_GROUNDPOOL",
+              "path": "Almanac_GroundPool"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_GROUNDNIGHTPOOL",
+              "path": "Almanac_GroundNightPool"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_GROUNDROOF",
+              "path": "Almanac_GroundRoof"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_GROUNDICE",
+              "path": "Almanac_GroundIce"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
               "id": "ALMANAC_CLOSEBUTTON",
               "path": "Almanac_CloseButton"
             },
@@ -5374,6 +5453,62 @@
             "attrs": {
               "id": "ALMANAC_INDEXBUTTONHIGHLIGHT",
               "path": "Almanac_IndexButtonHighlight"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_INDEXHEADER",
+              "path": "Almanac_IndexHeader"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_PLANTHEADER",
+              "path": "Almanac_PlantHeader"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_ZOMBIEHEADER",
+              "path": "Almanac_ZombieHeader"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_PAPER",
+              "path": "Almanac_Paper"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_INDEXPANELS",
+              "path": "Almanac_IndexPanels"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_PLANTDECOR",
+              "path": "Almanac_PlantDecor"
+            },
+            "children": []
+          },
+          {
+            "tag": "Image",
+            "attrs": {
+              "id": "ALMANAC_ZOMBIEDECOR",
+              "path": "Almanac_ZombieDecor"
             },
             "children": []
           }
@@ -5772,6 +5907,14 @@
             "attrs": {
               "id": "BRIANNETOD32",
               "path": "BrianneTod32.txt"
+            },
+            "children": []
+          },
+          {
+            "tag": "Font",
+            "attrs": {
+              "id": "BRIANNETOD32PLAIN",
+              "path": "BrianneTod32Plain.txt"
             },
             "children": []
           },

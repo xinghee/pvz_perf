@@ -39,23 +39,50 @@ void Free();
 namespace AlmanacAtlas {
 extern Sexy::GpuTexture* Texture;
 enum class Sprite : std::uint16_t {
-    ALMANAC_INDEXBACK = 0,
-    ALMANAC_PLANTBACK = 1,
-    ALMANAC_ZOMBIEBACK = 2,
-    ALMANAC_PLANTCARD = 3,
-    ALMANAC_ZOMBIECARD = 4,
-    ALMANAC_ZOMBIEWINDOW = 5,
-    ALMANAC_ZOMBIEWINDOW2 = 6,
-    ALMANAC_ZOMBIEBLANK = 7,
-    ALMANAC_CLOSEBUTTON = 8,
-    ALMANAC_CLOSEBUTTONHIGHLIGHT = 9,
-    ALMANAC_INDEXBUTTON = 10,
-    ALMANAC_INDEXBUTTONHIGHLIGHT = 11,
-    ALMANAC_IMITATER = 12,
-    ALMANAC_COMMON_BACK = 13,
-    Count = 14,
+    ALMANAC_PAPER = 0,
+    ALMANAC_INDEXPANELS = 1,
+    ALMANAC_PLANTDECOR = 2,
+    ALMANAC_ZOMBIEDECOR = 3,
+    ALMANAC_INDEXHEADER = 4,
+    ALMANAC_PLANTHEADER = 5,
+    ALMANAC_ZOMBIEHEADER = 6,
+    ALMANAC_INDEXBACK = 7,
+    ALMANAC_INDEXBACK_TOP = 8,
+    ALMANAC_INDEXBACK_TOPRIGHT = 9,
+    ALMANAC_INDEXBACK_LEFT = 10,
+    ALMANAC_INDEXBACK_RIGHT = 11,
+    ALMANAC_INDEXBACK_BOTTOMLEFT = 12,
+    ALMANAC_INDEXBACK_BOTTOM = 13,
+    ALMANAC_INDEXBACK_BOTTOMRIGHT = 14,
+    ALMANAC_PLANTBACK = 15,
+    ALMANAC_PLANTBACK_TOP = 16,
+    ALMANAC_PLANTBACK_TOPRIGHT = 17,
+    ALMANAC_PLANTBACK_LEFT = 18,
+    ALMANAC_PLANTBACK_RIGHT = 19,
+    ALMANAC_PLANTBACK_BOTTOMLEFT = 20,
+    ALMANAC_PLANTBACK_BOTTOM = 21,
+    ALMANAC_PLANTBACK_BOTTOMRIGHT = 22,
+    ALMANAC_ZOMBIEBACK = 23,
+    ALMANAC_ZOMBIEBACK_TOP = 24,
+    ALMANAC_ZOMBIEBACK_TOPRIGHT = 25,
+    ALMANAC_ZOMBIEBACK_LEFT = 26,
+    ALMANAC_ZOMBIEBACK_RIGHT = 27,
+    ALMANAC_ZOMBIEBACK_BOTTOMLEFT = 28,
+    ALMANAC_ZOMBIEBACK_BOTTOM = 29,
+    ALMANAC_ZOMBIEBACK_BOTTOMRIGHT = 30,
+    ALMANAC_PLANTCARD = 31,
+    ALMANAC_ZOMBIECARD = 32,
+    ALMANAC_ZOMBIEWINDOW = 33,
+    ALMANAC_ZOMBIEWINDOW2 = 34,
+    ALMANAC_ZOMBIEBLANK = 35,
+    ALMANAC_CLOSEBUTTON = 36,
+    ALMANAC_CLOSEBUTTONHIGHLIGHT = 37,
+    ALMANAC_INDEXBUTTON = 38,
+    ALMANAC_INDEXBUTTONHIGHLIGHT = 39,
+    ALMANAC_IMITATER = 40,
+    Count = 41,
 };
-inline constexpr std::size_t Count = 14;
+inline constexpr std::size_t Count = 41;
 extern const Sexy::TextureRegion Images[Count];
 extern const Sexy::Rect Crops[Count];
 void Load();
@@ -297,16 +324,22 @@ enum class Sprite : std::uint16_t {
     TOUCH_FRAME_TR = 25,
     TOUCH_FRAME_BL = 26,
     TOUCH_FRAME_BR = 27,
-    DIALOG_BAKED_NORMAL = 28,
-    DIALOG_BAKED_TALL = 29,
-    Count = 30,
+    SEED_CARD_54 = 28,
+    SEED_CARD_55 = 29,
+    SEED_CARD_56 = 30,
+    SEED_CARD_57 = 31,
+    SEED_CARD_58 = 32,
+    SEED_CARD_59 = 33,
+    DIALOG_BAKED_NORMAL = 34,
+    DIALOG_BAKED_TALL = 35,
+    Count = 36,
 };
-inline constexpr std::size_t Count = 30;
+inline constexpr std::size_t Count = 36;
 extern const Sexy::TextureRegion Images[Count];
 inline constexpr bool HasBakedDialogs=true;
 extern const Sexy::TextureRegion BakedDialogs[2];
-inline constexpr bool HasSeedCards=false;
-extern const Sexy::TextureRegion SeedCards[53];
+inline constexpr bool HasSeedCards=true;
+extern const Sexy::TextureRegion SeedCards[60];
 void Load();
 void Free();
 }

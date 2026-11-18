@@ -484,7 +484,7 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 			// ============================================================================================
 			bool aHighLight = aChallengeButton->mIsOver && theChallengeIndex != mUnlockChallengeIndex;
 			g->mColorizeImages = false;
-			g->DrawImage(aHighLight ? Sexy::IMAGE_CHALLENGE_WINDOW : Sexy::IMAGE_CHALLENGE_WINDOW_HIGHLIGHT, aPosX - 6, aPosY - 2);
+			g->DrawImage(aHighLight ? Sexy::IMAGE_CHALLENGE_WINDOW_HIGHLIGHT : Sexy::IMAGE_CHALLENGE_WINDOW, aPosX - 6, aPosY - 2);
 
 			// ============================================================================================
 			// ▲ 绘制小游戏的名称
@@ -582,22 +582,7 @@ void ChallengeScreen::Draw(Graphics* g)
 {
     mBackButton->mX = mApp->mScreenBounds.mX + 18;
 	g->mLinearBlend = true;
-	Image* aBackgroundImage = Sexy::IMAGE_CHALLENGE_BACKGROUND;
-	const Rect& aBounds = mApp->mScreenBounds;
-	const int aBorderWidth = 16;
-	const int aPaperWidth = aBounds.mWidth - aBorderWidth * 2;
-	// Keep paper and the title plaque in the original 800-wide world coordinates.
-	// Move only the native stone edge strips as the viewport changes, including odd widths.
-	const int aArtPadding = (aBackgroundImage->mWidth - BOARD_WIDTH) / 2;
-	const int aSourceX = aArtPadding + aBounds.mX + aBorderWidth;
-	Graphics aBackground(*g);
-	aBackground.ClipRect(aBounds);
-	aBackground.DrawImage(aBackgroundImage, aBounds.mX, 0,
-		Rect(0, 0, aBorderWidth, aBackgroundImage->mHeight));
-	aBackground.DrawImage(aBackgroundImage, aBounds.mX + aBorderWidth, 0,
-		Rect(aSourceX, 0, aPaperWidth, aBackgroundImage->mHeight));
-	aBackground.DrawImage(aBackgroundImage, aBounds.mX + aBounds.mWidth - aBorderWidth, 0,
-		Rect(aBackgroundImage->mWidth - aBorderWidth, 0, aBorderWidth, aBackgroundImage->mHeight));
+	TodDrawChallengeBackground(g, mApp->mScreenBounds);
 
 	SexyString aTitleString = 
 		mPageIndex == CHALLENGE_PAGE_SURVIVAL ? gStr.PICK_AREA.c_str() : 
@@ -615,7 +600,8 @@ void ChallengeScreen::Draw(Graphics* g)
 		aTrophyString += FormatInt(aTotalBuf, aTrophiesTotal);
 		TodDrawString(g, aTrophyString, 739, 73, Sexy::FONT_DWARVENTODCRAFT15, Color(255, 240, 0), DS_ALIGN_CENTER);
 	}
-	TodDrawImageScaledF(g, Sexy::IMAGE_TROPHY, 718, 26, 0.5f, 0.5f);
+	// Share the award trophy texture; no second low-resolution trophy image.
+	TodDrawImageScaledF(g, Sexy::IMAGE_TROPHY_HI_RES, 718, 26, 0.25f, 0.25f);
 
 	for (int aChallengeMode = 0; aChallengeMode < NUM_CHALLENGE_MODES; aChallengeMode++)
 		DrawButton(g, aChallengeMode);
