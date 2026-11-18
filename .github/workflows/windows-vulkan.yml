@@ -98,7 +98,7 @@ jobs:
           # policy 1x is acceptable; fonts.json goes away so the compiled fonts are
           # used instead of the (absent) authored 4x atlases.
           mkdir -p assets/high-resolution/current/images
-          cp -f assets/runtime/images/* assets/high-resolution/current/images/
+          cp -R -f assets/runtime/images/. assets/high-resolution/current/images/
           python - <<'EOF'
           import json, pathlib
           root = pathlib.Path("assets/high-resolution")
